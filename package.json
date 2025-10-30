@@ -1,0 +1,72 @@
+{
+  "name": "celo-ai-automation-engine",
+  "version": "2.0.0",
+  "description": "Advanced AI-powered blockchain automation system with LangChain integration",
+  "main": "automation-system.js",
+  "type": "module",
+  "scripts": {
+    "start": "node automation-system.js",
+    "dev": "node --watch automation-system.js",
+    "test": "node test-automation.js",
+    "test:integration": "node test-integration.js",
+    "test:all": "npm test && npm run test:integration",
+    "build": "echo 'No build step required for Node.js'",
+    "lint": "eslint . --ext .js",
+    "lint:fix": "eslint . --ext .js --fix",
+    "clean": "rm -rf test-data/ data/ backups/"
+  },
+  "keywords": [
+    "celo",
+    "blockchain",
+    "ai",
+    "automation",
+    "langchain",
+    "gemini",
+    "nft",
+    "defi",
+    "smart-contracts"
+  ],
+  "author": "Celo AI Agents Team",
+  "license": "MIT",
+  "packageManager": "pnpm@10.11.0",
+  "dependencies": {
+    "@langchain/core": "^0.3.0",
+    "@langchain/google-genai": "^0.0.24",
+    "@langchain/openai": "^0.3.0",
+    "@langchain/community": "^0.3.0",
+    "@google/generative-ai": "^0.21.0",
+    "better-sqlite3": "^11.6.0",
+    "cors": "^2.8.5",
+    "ethers": "^6.14.2",
+    "express": "^4.21.1",
+    "express-rate-limit": "^7.4.1",
+    "helmet": "^8.0.0",
+    "langchain": "^0.3.0",
+    "node-fetch": "^2.7.0",
+    "rollup": "^4.52.5",
+    "viem": "^2.21.45",
+    "ws": "^8.18.3",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "^4.52.5",
+    "@vitest/coverage-v8": "^1.6.0",
+    "eslint": "^8.57.0",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^6.6.0",
+    "vitest": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/celo-ai-agents/automation-engine"
+  },
+  "bugs": {
+    "url": "https://github.com/celo-ai-agents/automation-engine/issues"
+  },
+  "homepage": "https://github.com/celo-ai-agents/automation-engine#readme"
+}
