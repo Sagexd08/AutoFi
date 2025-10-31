@@ -1,22 +1,44 @@
 {
-  "name": "celo-ai-automation-engine",
-  "version": "2.0.0",
-  "description": "Advanced AI-powered blockchain automation system with LangChain integration",
-  "main": "automation-system.js",
+  "name": "autofi",
+  "version": "1.0.0",
+  "description": "Advanced AI-powered blockchain automation system with MCP and langchain integration",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "lib",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "start": "node automation-system.js",
     "dev": "node --watch automation-system.js",
-    "test": "node test-automation.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "test:integration": "node test-integration.js",
     "test:all": "npm test && npm run test:integration",
-    "build": "echo 'No build step required for Node.js'",
+    "build": "rollup -c",
+    "prebuild": "rimraf dist",
+    "prepare": "npm run build",
     "lint": "eslint . --ext .js",
     "lint:fix": "eslint . --ext .js --fix",
-    "clean": "rm -rf test-data/ data/ backups/"
+    "clean": "rimraf dist test-data/ data/ backups/",
+    "prepublishOnly": "npm test && npm run lint",
+    "preversion": "npm run lint",
+    "version": "npm run build && git add -A dist",
+    "postversion": "git push && git push --tags"
   },
   "keywords": [
-    "celo",
     "blockchain",
     "ai",
     "automation",
@@ -30,11 +52,11 @@
   "license": "MIT",
   "packageManager": "pnpm@10.11.0",
   "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "@langchain/community": "^0.3.0",
     "@langchain/core": "^0.3.0",
     "@langchain/google-genai": "^0.0.24",
     "@langchain/openai": "^0.3.0",
-    "@langchain/community": "^0.3.0",
-    "@google/generative-ai": "^0.21.0",
     "better-sqlite3": "^11.6.0",
     "cors": "^2.8.5",
     "ethers": "^6.14.2",
@@ -56,6 +78,7 @@
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-promise": "^6.6.0",
+    "rimraf": "^6.1.0",
     "vitest": "^1.6.0"
   },
   "engines": {
