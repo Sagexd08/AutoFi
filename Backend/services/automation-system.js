@@ -24,6 +24,9 @@ import { ContractFactory } from '../contract-factory.js';
 import { MonitoringSystem } from '../monitoring-system.js';
 import PostmanProtocol from '../postman-protocol.js';
 import apiRoutes from '../routes/api-routes.js';
+import EnvironmentManager from './environment-manager.js';
+import CodeGenerator from './code-generator.js';
+import RebalancerSystem from './rebalancer-system.js';
 import 'dotenv/config';
 import EventEmitter from 'events';
 
@@ -74,6 +77,11 @@ export class CombinedAutomationSystem extends EventEmitter {
     this.contractFactory = null;
     this.monitoringSystem = null;
     this.postmanProtocol = null;
+    
+    // New architecture components
+    this.environmentManager = null;
+    this.codeGenerator = null;
+    this.rebalancerSystem = null;
 
     this.initializeAI();
     this.initializeDatabase();
@@ -87,7 +95,9 @@ export class CombinedAutomationSystem extends EventEmitter {
     this.initializeSupabase();
     this.initializeAgentSystems();
     this.initializeAdvancedFeatures();
-    this.initializeEnhancedFeatures();
+    this.initializeEnhancedFeatures().catch((error) => {
+      console.error('❌ Failed to initialize enhanced features:', error);
+    });
     this.initializeExpress();
   }
 
@@ -823,6 +833,32 @@ export class CombinedAutomationSystem extends EventEmitter {
     return 'traditional';
   }
 
+  /**
+   * Route request to Code Generator
+   * @param {Object} parameters - Code generation parameters
+   * @returns {Promise<Object>} Code generation result
+   */
+  async generateCode(parameters) {
+    if (!this.codeGenerator) {
+      throw new Error('Code Generator not initialized');
+    }
+    return await this.codeGenerator.generateCode(parameters);
+  }
+
+  async rebalancePortfolio(parameters) {
+    if (!this.rebalancerSystem) {
+      throw new Error('Rebalancer System not initialized');
+    }
+    return await this.rebalancerSystem.rebalancePortfolio(parameters);
+  }
+
+  async routeThroughEnvironment(request) {
+    if (!this.environmentManager) {
+      throw new Error('Environment Manager not initialized');
+    }
+    return await this.environmentManager.routeRequest(request);
+  }
+
   async analyzeSecurityRisk(parsedResult) {
     const riskFactors = [];
     let riskScore = 0;
@@ -1188,7 +1224,7 @@ Guidelines:
     this.setupErrorHandlers();
   }
 
-  initializeEnhancedFeatures() {
+  async initializeEnhancedFeatures() {
     console.log('🚀 Initializing Enhanced Features...');
     
     // Initialize Multi-Chain Configuration
@@ -1238,6 +1274,70 @@ Guidelines:
       }
     }
 
+    // Initialize Environment Manager
+    try {
+      this.environmentManager = new EnvironmentManager({
+        enableAutoFiSDK: true,
+        enableToolRegistry: true,
+        autoLoadTools: true
+      });
+      console.log('✅ Environment Manager initialized');
+    } catch (error) {
+      console.error('❌ Failed to initialize Environment Manager:', error);
+    }
+
+    // Initialize Code Generator
+    try {
+      this.codeGenerator = new CodeGenerator({
+        enableCompilation: true,
+        enableDeployment: this.config.enableContractFactory,
+        defaultChain: this.config.network || 'alfajores',
+        contractFactory: this.contractFactory
+      });
+      if (this.contractFactory) {
+        this.codeGenerator.setContractFactory(this.contractFactory);
+      }
+      console.log('✅ Code Generator initialized');
+    } catch (error) {
+      console.error('❌ Failed to initialize Code Generator:', error);
+    }
+
+    // Initialize Rebalancer System
+    try {
+      this.rebalancerSystem = new RebalancerSystem({
+        enableAutoRebalancing: true,
+        automationSystem: this
+      });
+      console.log('✅ Rebalancer System initialized');
+    } catch (error) {
+      console.error('❌ Failed to initialize Rebalancer System:', error);
+    }
+
+    if (this.environmentManager && this.contractFactory) {
+      try {
+        const { AutoFiSDK } = await import('../sdk/dist/sdk/autofi-sdk.js');
+        const autofiSDK = new AutoFiSDK({
+          enableMultiChain: this.config.enableMultiChain,
+          enableProxy: this.config.enableProxy,
+          enableTesting: this.config.enableTesting
+        });
+        
+        this.environmentManager.setAutoFiSDK(autofiSDK);
+        
+        await this.environmentManager.initialize({
+          autofiSDK: autofiSDK,
+          tools: []
+        });
+        
+        console.log('✅ AutoFi SDK initialized and connected to Environment Manager');
+      } catch (error) {
+        console.error('❌ Failed to initialize AutoFi SDK:', error);
+        if (error instanceof Error) {
+          console.error('Error details:', error.message, error.stack);
+        }
+      }
+    }
+
     // Initialize Proxy Server
     if (this.config.enableProxy) {
       try {
@@ -1255,10 +1355,15 @@ Guidelines:
       }
     }
 
-    // Add enhanced API routes
     if (this.app) {
-      this.app.use('/api', apiRoutes);
-      console.log('✅ Enhanced API routes added');
+      try {
+        const { createApiRoutes } = await import('../routes/api-routes.js');
+        const routes = createApiRoutes(this);
+        this.app.use('/api', routes);
+        console.log('✅ Enhanced API routes added');
+      } catch (error) {
+        console.error('❌ Failed to add enhanced API routes:', error);
+      }
     }
   }
 

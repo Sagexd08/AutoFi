@@ -106,6 +106,10 @@ export class CeloAISDK extends EventEmitter {
     });
   }
 
+  async initialize(): Promise<void> {
+    return this.initializeChains();
+  }
+
   async initializeChains(): Promise<void> {
     try {
       await this.multiChainManager.initialize();

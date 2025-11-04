@@ -20,6 +20,8 @@ npm install @celo-ai/sdk
 
 ## Quick Start
 
+### Using CeloAISDK
+
 ```typescript
 import { CeloAISDK } from '@celo-ai/sdk';
 
@@ -32,8 +34,8 @@ const sdk = new CeloAISDK({
   enableTesting: true,
 });
 
-// Initialize chains
-await sdk.initializeChains();
+// Initialize the SDK
+await sdk.initialize();
 
 // Create an AI agent
 const agentId = await sdk.createAgent({
@@ -61,6 +63,34 @@ const txResponse = await sdk.sendTransaction({
   value: '1000000000000000000', // 1 ETH
   gasLimit: '21000',
 });
+```
+
+### Using AutoFi SDK
+
+The AutoFi SDK is a branded wrapper around CeloAISDK that provides the same functionality with AutoFi branding:
+
+```typescript
+import { AutoFiSDK } from '@celo-ai/sdk/autofi';
+
+// Initialize AutoFi SDK
+const autofiSDK = new AutoFiSDK({
+  apiKey: 'your-api-key',
+  privateKey: 'your-private-key',
+  network: 'ethereum',
+  enableMultiChain: true,
+});
+
+// All CeloAISDK methods are available
+await autofiSDK.initialize();
+const agentId = await autofiSDK.createAgent({ /* ... */ });
+
+// Note: initialize() and initializeChains() are interchangeable methods
+```
+
+Or use the main export:
+
+```typescript
+import AutoFiSDK from '@celo-ai/sdk/autofi';
 ```
 
 ## Multi-Chain Support

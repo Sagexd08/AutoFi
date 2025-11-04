@@ -1,19 +1,34 @@
 {
-  "name": "celo-ai-automation-engine",
+  "name": "@celo-ai/automation-engine",
   "version": "2.0.0",
   "description": "Advanced AI-powered blockchain automation system with Gemini integration",
-  "main": "automation-system.js",
+  "main": "services/automation-system.js",
   "type": "module",
+  "exports": {
+    ".": "./services/automation-system.js",
+    "./environment": "./services/environment-manager.js",
+    "./code-generator": "./services/code-generator.js",
+    "./rebalancer": "./services/rebalancer-system.js"
+  },
+  "files": [
+    "services/",
+    "agents/",
+    "routes/",
+    "lib/",
+    "package.json",
+    "README.md"
+  ],
   "scripts": {
-    "start": "node automation-system.js",
-    "dev": "node --watch automation-system.js",
+    "start": "node services/automation-system.js",
+    "dev": "node --watch services/automation-system.js",
     "test": "node test-automation.js",
     "test:integration": "node test-integration.js",
     "test:all": "npm test && npm run test:integration",
     "build": "echo 'No build step required for Node.js'",
     "lint": "eslint . --ext .js",
     "lint:fix": "eslint . --ext .js --fix",
-    "clean": "rm -rf test-data/ data/ backups/"
+    "clean": "rm -rf test-data/ data/ backups/",
+    "prepublishOnly": "npm run clean && npm test"
   },
   "keywords": [
     "celo",
@@ -23,7 +38,11 @@
     "gemini",
     "nft",
     "defi",
-    "smart-contracts"
+    "smart-contracts",
+    "autofi",
+    "environment-manager",
+    "code-generator",
+    "rebalancer"
   ],
   "author": "Celo AI Agents Team",
   "license": "MIT",
@@ -66,5 +85,9 @@
   "bugs": {
     "url": "https://github.com/celo-ai-agents/automation-engine/issues"
   },
-  "homepage": "https://github.com/celo-ai-agents/automation-engine#readme"
+  "homepage": "https://github.com/celo-ai-agents/automation-engine#readme",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
 }

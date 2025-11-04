@@ -212,8 +212,8 @@ export class AutoFiSDK extends EventEmitter {
 
   async shutdown(): Promise<void> {
     try {
-      if (this.sdk && typeof this.sdk.shutdown === 'function') {
-        await this.sdk.shutdown();
+      if (typeof (this.sdk as any).shutdown === 'function') {
+        await (this.sdk as any).shutdown();
       }
     } catch (error) {
       console.error('Error during SDK shutdown:', error);

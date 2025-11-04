@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Loader2, Send } from "lucide-react"
 import { motion } from "framer-motion"
 import { toast } from "sonner"
+import { apiClient } from "@/lib/api-client"
 
 interface PromptModalProps {
   open: boolean
@@ -23,19 +24,28 @@ export default function PromptModal({ open, onOpenChange, templateName = "Templa
 
     setIsLoading(true)
     try {
-      // Call your AI/model API here
-      // Example: const response = await fetch('/api/generate-automation', { method: 'POST', body: JSON.stringify({ prompt }) })
-      console.log("Prompt submitted:", prompt)
+      // Call AI system through API client
+      const response = await apiClient.processNaturalLanguage(prompt, {
+        templateName,
+        timestamp: new Date().toISOString()
+      })
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // Success - you can add a toast notification here
-      setPrompt("")
-      toast.success("Automation created successfully")
-      onOpenChange(false)
+      if (response.success && response.data) {
+        toast.success("Automation processed successfully", {
+          description: response.data.response || "AI has processed your request"
+        })
+        setPrompt("")
+        onOpenChange(false)
+      } else {
+        toast.error("Failed to process automation", {
+          description: response.error || "Unknown error occurred"
+        })
+      }
     } catch (error) {
       console.error("Error processing prompt:", error)
+      toast.error("Failed to process automation", {
+        description: error instanceof Error ? error.message : "Unknown error occurred"
+      })
     } finally {
       setIsLoading(false)
     }

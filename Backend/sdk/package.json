@@ -3,7 +3,21 @@
   "version": "1.0.0",
   "description": "Celo AI Automation Engine SDK - Multi-chain blockchain automation with AI agents",
   "main": "dist/index.js",
+  "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./autofi": {
+      "import": "./dist/sdk/autofi-sdk.js",
+      "require": "./dist/sdk/autofi-sdk.js",
+      "types": "./dist/sdk/autofi-sdk.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
     "dist",
     "README.md",
@@ -20,7 +34,8 @@
     "format": "prettier --write src/**/*.ts",
     "format:check": "prettier --check src/**/*.ts",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "npm run build && npm test",
+    "prepack": "npm run build",
     "docs": "typedoc src/index.ts --out docs",
     "clean": "rimraf dist docs"
   },

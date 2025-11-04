@@ -1,19 +1,34 @@
 {
   "name": "celo-ai-automation-engine",
   "version": "2.0.0",
-  "description": "Advanced AI-powered blockchain automation system with Gemini integration",
+  "description": "Advanced AI-powered blockchain automation system with Gemini integration - Complete monorepo with SDK and Backend services",
   "main": "start.js",
   "type": "module",
+  "exports": {
+    ".": "./start.js",
+    "./sdk": "./Backend/sdk/dist/index.js",
+    "./autofi": "./Backend/sdk/dist/sdk/autofi-sdk.js",
+    "./backend": "./Backend/services/automation-system.js"
+  },
+  "workspaces": [
+    "Backend",
+    "Backend/sdk",
+    "Frontend",
+    "blockchain"
+  ],
   "scripts": {
     "start": "node start.js",
     "dev": "node --watch start.js",
     "test": "cd Backend && npm test",
     "test:integration": "cd Backend && npm run test:integration",
     "test:all": "cd Backend && npm run test:all",
-    "build": "echo 'No build step required for Node.js'",
+    "build": "cd Backend/sdk && npm run build",
+    "build:sdk": "cd Backend/sdk && npm run build",
     "lint": "cd Backend && npm run lint",
     "lint:fix": "cd Backend && npm run lint:fix",
-    "clean": "cd Backend && npm run clean"
+    "clean": "cd Backend && npm run clean && cd Backend/sdk && npm run clean",
+    "publish:sdk": "cd Backend/sdk && npm publish",
+    "publish:backend": "cd Backend && npm publish"
   },
   "keywords": [
     "celo",

@@ -1,0 +1,64 @@
+# Test files
+test-*.js
+*.test.js
+*.spec.js
+__tests__/
+tests/
+
+# Data directories
+data/
+test-data/
+backups/
+temp/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# CI/CD
+.github/
+.travis.yml
+.circleci/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+*.iml
+.project
+.classpath
+.settings/
+
+# Build artifacts
+dist/
+build/
+*.map
+
+# SDK (separate package)
+sdk/
+
+# Documentation
+docs/
+*.md
+!README.md
+

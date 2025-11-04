@@ -4,16 +4,19 @@ import { ProxyServer } from '../proxy-server.js';
 import { ContractFactory } from '../contract-factory.js';
 import { MonitoringSystem } from '../monitoring-system.js';
 import PostmanProtocol from '../postman-protocol.js';
+import { validateToolExecution } from './tool-validation-middleware.js';
 
-const router = express.Router();
-
-// Initialize services
-const multiChainConfig = new MultiChainConfig();
-const contractFactory = new ContractFactory(multiChainConfig);
-const monitoringSystem = new MonitoringSystem();
-const postmanProtocol = new PostmanProtocol({
-  apiKey: process.env.POSTMAN_API_KEY,
-});
+// Factory function to create router with automation system
+export function createApiRoutes(automationSystem = null) {
+  const router = express.Router();
+  
+  // If automation system is provided, use its components
+  const multiChainConfig = automationSystem?.multiChainConfig || new MultiChainConfig();
+  const contractFactory = automationSystem?.contractFactory || new ContractFactory(multiChainConfig);
+  const monitoringSystem = automationSystem?.monitoringSystem || new MonitoringSystem();
+  const postmanProtocol = automationSystem?.postmanProtocol || new PostmanProtocol({
+    apiKey: process.env.POSTMAN_API_KEY,
+  });
 
 // Chain routes
 router.get('/chains', async (req, res) => {
@@ -388,32 +391,271 @@ router.post('/agents/:agentId/process', async (req, res) => {
   }
 });
 
-// Health check
-router.get('/health', async (req, res) => {
-  try {
-    const health = {
-      healthy: true,
-      status: 'operational',
-      timestamp: new Date().toISOString(),
-      services: {
-        chains: true,
-        contracts: true,
-        monitoring: true,
-        testing: true,
-        agents: true,
-      },
-      uptime: process.uptime(),
-      version: '1.0.0',
-    };
-    
-    res.json(health);
-  } catch (error) {
-    res.status(500).json({ 
-      healthy: false, 
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
+  // Code Generator routes
+  router.post('/code-generator/generate', async (req, res) => {
+    try {
+      if (!automationSystem?.codeGenerator) {
+        return res.status(503).json({ error: 'Code Generator not available' });
+      }
+      
+      const { description, name, language, options } = req.body;
+      const result = await automationSystem.codeGenerator.generateCode({
+        description,
+        name,
+        language,
+        options
+      });
+      
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 
+  router.post('/code-generator/compile', async (req, res) => {
+    try {
+      if (!automationSystem?.codeGenerator) {
+        return res.status(503).json({ error: 'Code Generator not available' });
+      }
+      
+      const { source, name } = req.body;
+      const result = await automationSystem.codeGenerator.compileCode({
+        source,
+        name
+      });
+      
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.post('/code-generator/deploy', async (req, res) => {
+    try {
+      if (!automationSystem?.codeGenerator) {
+        return res.status(503).json({ error: 'Code Generator not available' });
+      }
+      
+      const { source, name, chainId, constructorArgs } = req.body;
+      const result = await automationSystem.codeGenerator.deployCode({
+        source,
+        name,
+        chainId,
+        constructorArgs
+      });
+      
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.post('/code-generator/generate-and-deploy', async (req, res) => {
+    try {
+      if (!automationSystem?.codeGenerator) {
+        return res.status(503).json({ error: 'Code Generator not available' });
+      }
+      
+      const result = await automationSystem.codeGenerator.generateAndDeploy(req.body);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Rebalancer System routes
+  router.post('/rebalancer/analyze', async (req, res) => {
+    try {
+      if (!automationSystem?.rebalancerSystem) {
+        return res.status(503).json({ error: 'Rebalancer System not available' });
+      }
+      
+      const result = await automationSystem.rebalancerSystem.analyzePortfolio(req.body);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.post('/rebalancer/rebalance', async (req, res) => {
+    try {
+      if (!automationSystem?.rebalancerSystem) {
+        return res.status(503).json({ error: 'Rebalancer System not available' });
+      }
+      
+      const result = await automationSystem.rebalancerSystem.rebalancePortfolio(req.body);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/rebalancer/portfolio/:walletAddress', async (req, res) => {
+    try {
+      if (!automationSystem?.rebalancerSystem) {
+        return res.status(503).json({ error: 'Rebalancer System not available' });
+      }
+      
+      const { walletAddress } = req.params;
+      const portfolio = automationSystem.rebalancerSystem.getPortfolio(walletAddress);
+      
+      if (!portfolio) {
+        return res.status(404).json({ error: 'Portfolio not found' });
+      }
+      
+      res.json(portfolio);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/rebalancer/history', async (req, res) => {
+    try {
+      if (!automationSystem?.rebalancerSystem) {
+        return res.status(503).json({ error: 'Rebalancer System not available' });
+      }
+      
+      const { walletAddress } = req.query;
+      const history = automationSystem.rebalancerSystem.getRebalanceHistory(walletAddress);
+      res.json({ history });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.post('/rebalancer/yield-opportunities', async (req, res) => {
+    try {
+      if (!automationSystem?.rebalancerSystem) {
+        return res.status(503).json({ error: 'Rebalancer System not available' });
+      }
+      
+      const result = await automationSystem.rebalancerSystem.findYieldOpportunities(req.body);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Environment Manager routes
+  router.get('/environment/tools', async (req, res) => {
+    try {
+      if (!automationSystem?.environmentManager) {
+        return res.status(503).json({ error: 'Environment Manager not available' });
+      }
+      
+      const tools = automationSystem.environmentManager.getTools();
+      res.json({ tools });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/environment/tools/:toolId', async (req, res) => {
+    try {
+      if (!automationSystem?.environmentManager) {
+        return res.status(503).json({ error: 'Environment Manager not available' });
+      }
+      
+      const { toolId } = req.params;
+      const tool = automationSystem.environmentManager.getTool(toolId);
+      
+      if (!tool) {
+        return res.status(404).json({ error: 'Tool not found' });
+      }
+      
+      res.json(tool);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.post('/environment/tools/:toolId/execute', validateToolExecution(automationSystem), async (req, res) => {
+    try {
+      // Validation middleware ensures environmentManager is available and tool exists
+      // Parameters are already validated and sanitized by middleware
+      const { toolId } = req.params;
+      const { parameters } = req.body;
+      
+      const result = await automationSystem.environmentManager.executeTool(toolId, parameters);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.post('/environment/route', async (req, res) => {
+    try {
+      if (!automationSystem?.environmentManager) {
+        return res.status(503).json({ error: 'Environment Manager not available' });
+      }
+      
+      const result = await automationSystem.environmentManager.routeRequest(req.body);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/environment/stats', async (req, res) => {
+    try {
+      if (!automationSystem?.environmentManager) {
+        return res.status(503).json({ error: 'Environment Manager not available' });
+      }
+      
+      const stats = automationSystem.environmentManager.getStats();
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/environment/health', async (req, res) => {
+    try {
+      if (!automationSystem?.environmentManager) {
+        return res.status(503).json({ error: 'Environment Manager not available' });
+      }
+      
+      const health = automationSystem.environmentManager.getHealth();
+      res.json(health);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Health check
+  router.get('/health', async (req, res) => {
+    try {
+      const health = {
+        healthy: true,
+        status: 'operational',
+        timestamp: new Date().toISOString(),
+        services: {
+          chains: true,
+          contracts: true,
+          monitoring: true,
+          testing: true,
+          agents: true,
+          codeGenerator: !!automationSystem?.codeGenerator,
+          rebalancer: !!automationSystem?.rebalancerSystem,
+          environment: !!automationSystem?.environmentManager,
+        },
+        uptime: process.uptime(),
+        version: '1.0.0',
+      };
+      
+      res.json(health);
+    } catch (error) {
+      res.status(500).json({ 
+        healthy: false, 
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  return router;
+}
+
+// Default export for backward compatibility
+const router = createApiRoutes();
 export default router;
