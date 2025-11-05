@@ -611,10 +611,10 @@ export class ConsolidatedAgentSystem extends EventEmitter {
   // -----------------------------------------------------------------------
   // Embedded LangChainAgent compatibility
   // -----------------------------------------------------------------------
-  attachLangChainAgent() {
+  async attachLangChainAgent() {
     if (!this.langChainAgent) {
       try {
-        this.langChainAgent = new LangChainAgent({
+        this.langChainAgent = await LangChainAgent.create({
           geminiApiKey: this.automationSystem?.config?.geminiApiKey,
           openaiApiKey: this.automationSystem?.config?.openaiApiKey
         });

@@ -3,9 +3,52 @@ import { CeloClient } from '../client.js';
 import type {
   TransactionResult,
   TokenBalance,
-  TransactionRequest,
   ContractCall,
 } from '@celo-automator/types';
+
+/**
+ * ERC20 standard ABI including common functions
+ */
+const ERC20_ABI = [
+  {
+    constant: true,
+    inputs: [{ name: '_owner', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: 'balance', type: 'uint256' }],
+    type: 'function',
+  },
+  {
+    constant: true,
+    inputs: [],
+    name: 'decimals',
+    outputs: [{ name: '', type: 'uint8' }],
+    type: 'function',
+  },
+  {
+    constant: true,
+    inputs: [],
+    name: 'symbol',
+    outputs: [{ name: '', type: 'string' }],
+    type: 'function',
+  },
+  {
+    constant: true,
+    inputs: [],
+    name: 'name',
+    outputs: [{ name: '', type: 'string' }],
+    type: 'function',
+  },
+  {
+    constant: false,
+    inputs: [
+      { name: '_to', type: 'address' },
+      { name: '_value', type: 'uint256' },
+    ],
+    name: 'transfer',
+    outputs: [{ name: '', type: 'bool' }],
+    type: 'function',
+  },
+] as const;
 
 /**
  * Get native CELO balance for an address
@@ -28,67 +71,36 @@ export async function getTokenBalance(
 ): Promise<TokenBalance> {
   const publicClient = client.getPublicClient();
 
-  const erc20Abi = [
-    {
-      constant: true,
-      inputs: [{ name: '_owner', type: 'address' }],
-      name: 'balanceOf',
-      outputs: [{ name: 'balance', type: 'uint256' }],
-      type: 'function',
-    },
-    {
-      constant: true,
-      inputs: [],
-      name: 'decimals',
-      outputs: [{ name: '', type: 'uint8' }],
-      type: 'function',
-    },
-    {
-      constant: true,
-      inputs: [],
-      name: 'symbol',
-      outputs: [{ name: '', type: 'string' }],
-      type: 'function',
-    },
-    {
-      constant: true,
-      inputs: [],
-      name: 'name',
-      outputs: [{ name: '', type: 'string' }],
-      type: 'function',
-    },
-  ] as const;
-
   const [balance, decimals, symbol, name] = await Promise.all([
     publicClient.readContract({
       address: tokenAddress,
-      abi: erc20Abi,
+      abi: ERC20_ABI,
       functionName: 'balanceOf',
       args: [address],
     }),
     publicClient.readContract({
       address: tokenAddress,
-      abi: erc20Abi,
+      abi: ERC20_ABI,
       functionName: 'decimals',
     }),
     publicClient.readContract({
       address: tokenAddress,
-      abi: erc20Abi,
+      abi: ERC20_ABI,
       functionName: 'symbol',
     }),
     publicClient.readContract({
       address: tokenAddress,
-      abi: erc20Abi,
+      abi: ERC20_ABI,
       functionName: 'name',
     }).catch(() => undefined),
   ]);
 
   return {
     token: tokenAddress,
-    balance: balance.toString(),
+    balance: (balance as bigint).toString(),
     decimals: Number(decimals),
-    symbol: symbol || 'UNKNOWN',
-    name: name || undefined,
+    symbol: (symbol as string) || 'UNKNOWN',
+    name: (name as string | undefined) || undefined,
   };
 }
 
@@ -146,23 +158,10 @@ export async function sendToken(
     throw new Error('Private key required for sending transactions');
   }
 
-  const erc20Abi = [
-    {
-      constant: false,
-      inputs: [
-        { name: '_to', type: 'address' },
-        { name: '_value', type: 'uint256' },
-      ],
-      name: 'transfer',
-      outputs: [{ name: '', type: 'bool' }],
-      type: 'function',
-    },
-  ] as const;
-
   try {
     const { request } = await client.getPublicClient().simulateContract({
       address: tokenAddress,
-      abi: erc20Abi,
+      abi: ERC20_ABI,
       functionName: 'transfer',
       args: [to, BigInt(amount)],
       account: await walletClient.getAddresses().then((addrs) => addrs[0]),

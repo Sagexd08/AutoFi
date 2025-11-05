@@ -292,6 +292,72 @@ export class PostmanProtocol extends EventEmitter {
       };
     }
   }
+  findItemById(items, testId) {
+    for (const item of items) {
+      if (item.id === testId || item.name === testId || item.uid === testId) {
+        return item;
+      }
+      if (item.item) {
+        const found = this.findItemById(item.item, testId);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+  async runTest(collectionId, testId, environmentId = null) {
+    const startTime = Date.now();
+    try {
+      const collection = await this.getCollection(collectionId);
+      const environment = environmentId ? await this.getEnvironment(environmentId) : null;
+      
+      const testItem = this.findItemById(collection.item, testId);
+      if (!testItem) {
+        throw new Error(`Test with ID "${testId}" not found in collection "${collectionId}"`);
+      }
+      
+      if (!testItem.request) {
+        throw new Error(`Test item "${testId}" does not have a request`);
+      }
+      
+      const executionResult = await this.executeRequest(testItem.request, environment);
+      const duration = Date.now() - startTime;
+      
+      const testResult = {
+        id: testId,
+        testName: testItem.name || `Test ${testId}`,
+        success: executionResult.success,
+        status: executionResult.success ? 'passed' : 'failed',
+        duration,
+        timestamp: new Date().toISOString(),
+        request: executionResult.request,
+        response: {
+          status: executionResult.status,
+          statusText: executionResult.statusText,
+          headers: executionResult.headers,
+          data: executionResult.data
+        },
+        error: executionResult.error || null
+      };
+      
+      this.testResults.set(`${collectionId}_${testId}_${Date.now()}`, testResult);
+      this.emit('testCompleted', { collectionId, testId, result: testResult });
+      
+      return testResult;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const errorResult = {
+        id: testId,
+        testName: `Test ${testId}`,
+        success: false,
+        status: 'failed',
+        duration,
+        timestamp: new Date().toISOString(),
+        error: error.message
+      };
+      this.emit('testFailed', { collectionId, testId, error: error.message });
+      throw error;
+    }
+  }
   async createMonitor(monitorData) {
     try {
       const response = await this.client.post('/monitors', {
@@ -428,4 +494,4 @@ export class PostmanProtocol extends EventEmitter {
     };
   }
 }
-export default PostmanProtocol;
+export default PostmanProtocol;

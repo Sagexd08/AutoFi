@@ -15,21 +15,27 @@ const gasEstimation = new GasEstimationService();
 const transactionTracker = new TransactionTracker();
 
 // Initialize AI agent
-const agent = new LangChainAgent({
-  apiKey: "YOUR_API_KEY",
-});
+let agent;
 
 // Create automation system
 const automation = new AutomationSystem({
   etherscanService,
   gasEstimation,
   transactionTracker,
-  agent,
+  agent: null, // Will be set after async initialization
 });
 
 // Example usage
 async function main() {
   try {
+    // Initialize agent with async factory method
+    agent = await LangChainAgent.create({
+      apiKey: "YOUR_API_KEY",
+    });
+    
+    // Set agent on automation system
+    automation.agent = agent;
+
     // Start monitoring transactions
     await automation.start();
 

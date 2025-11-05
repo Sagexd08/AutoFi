@@ -9,6 +9,7 @@ import { AgentExecutor, createOpenAIFunctionsAgent } from 'langchain/agents';
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { createPublicClient, createWalletClient, http as viem_http, parseEther, formatEther } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
 import { celo } from 'viem/chains';
 
 const DEFAULT_ADDRESS = '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEbb';
@@ -21,6 +22,17 @@ const CELO_TOKENS = {
 };
 
 export class LangChainAgent {
+  /**
+   * Static factory method to create and initialize a LangChainAgent instance
+   * @param {Object} config - Configuration object
+   * @returns {Promise<LangChainAgent>} Fully initialized agent instance
+   */
+  static async create(config = {}) {
+    const instance = new LangChainAgent(config);
+    await instance.initialize();
+    return instance;
+  }
+
   constructor(config = {}) {
     this.config = {
       geminiApiKey: config.geminiApiKey || process.env.GEMINI_API_KEY,
@@ -36,11 +48,13 @@ export class LangChainAgent {
     this.walletClient = null;
     this.llm = null;
     this.agent = null;
+  }
 
+  async initialize() {
     this.initializeBlockchainClients();
     this.initializeLLM();
     this.createTools();
-    this.createAgent();
+    await this.createAgent();
   }
 
   initializeBlockchainClients() {
@@ -53,12 +67,29 @@ export class LangChainAgent {
 
       // Create wallet client if private key is provided
       if (this.config.privateKey && this.config.privateKey !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
-        this.walletClient = createWalletClient({
-          chain: celo,
-          transport: viem_http(this.config.rpcUrl),
-          account: this.config.privateKey
-        });
-        console.log('✅ Wallet client initialized');
+        try {
+          // Validate private key format
+          if (!this.config.privateKey.startsWith('0x')) {
+            throw new Error('Private key must start with 0x');
+          }
+          if (this.config.privateKey.length !== 66) {
+            throw new Error('Private key must be 66 characters long (0x + 64 hex characters)');
+          }
+
+          // Convert private key to account object
+          const account = privateKeyToAccount(this.config.privateKey);
+          
+          this.walletClient = createWalletClient({
+            chain: celo,
+            transport: viem_http(this.config.rpcUrl),
+            account
+          });
+          console.log('✅ Wallet client initialized');
+        } catch (accountError) {
+          console.error('❌ Failed to create account from private key:', accountError.message);
+          console.warn('⚠️ Invalid private key - transaction execution disabled');
+          this.walletClient = null;
+        }
       } else {
         console.warn('⚠️ No valid private key provided - transaction execution disabled');
       }
@@ -307,6 +338,19 @@ Report results clearly to the user.`],
 
   async process(input) {
     try {
+      // Ensure agent is initialized before processing
+      if (!this.agent) {
+        // If agent is null, try to initialize it
+        if (!this._initializationPromise) {
+          this._initializationPromise = this.initialize();
+        }
+        await this._initializationPromise;
+      }
+
+      if (!this.agent) {
+        throw new Error('Agent failed to initialize. Please check your configuration.');
+      }
+
       const executor = new AgentExecutor({
         agent: this.agent,
         tools: this.tools,

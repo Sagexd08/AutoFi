@@ -23,14 +23,14 @@ const createErrorResponse = (statusCode, error, timestamp = DEFAULT_TIMESTAMP())
   timestamp,
 });
 
-const createSuccessResponse = (data, timestamp = DEFAULT_TIMESTAMP()) => ({
+const createSuccessResponse = (data = {}, timestamp = DEFAULT_TIMESTAMP()) => ({
   success: true,
-  ...data,
   timestamp,
+  data,
 });
 
 const validateRequired = (obj, fields) => {
-  const missing = fields.filter(field => !obj[field]);
+  const missing = fields.filter(field => !(Object.prototype.hasOwnProperty.call(obj, field) && obj[field] !== undefined && obj[field] !== null));
   if (missing.length > 0) {
     throw new Error(`Missing required fields: ${missing.join(', ')}`);
   }
@@ -103,7 +103,18 @@ export function createApiRoutes(automationSystem = null) {
 
   router.get('/contracts/:address', standardRateLimiter, asyncHandler(async (req, res) => {
     const { address } = req.params;
-    const { abi, abiUrl, chainId = DEFAULT_CHAIN_ID, includeBytecode = false, includeMetadata = true, includeAnalysis = true } = req.query;
+    const { abi, abiUrl, chainId = DEFAULT_CHAIN_ID } = req.query;
+    
+    // Coerce boolean query parameters explicitly (query params are strings, so 'false' is truthy)
+    const includeBytecodeFlag = req.query.includeBytecode !== undefined 
+      ? (String(req.query.includeBytecode).toLowerCase() === 'true' || req.query.includeBytecode === '1')
+      : false;
+    const includeMetadataFlag = req.query.includeMetadata !== undefined
+      ? (String(req.query.includeMetadata).toLowerCase() === 'true' || req.query.includeMetadata === '1')
+      : true;
+    const includeAnalysisFlag = req.query.includeAnalysis !== undefined
+      ? (String(req.query.includeAnalysis).toLowerCase() === 'true' || req.query.includeAnalysis === '1')
+      : true;
     
     validateAddress(address);
     
@@ -114,17 +125,56 @@ export function createApiRoutes(automationSystem = null) {
     let parsedAbi;
     try {
       if (abiUrl) {
+        // Validate URL scheme and prevent internal network access
+        const url = new URL(abiUrl);
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          throw new Error('Only HTTP and HTTPS protocols are allowed');
+        }
+        
+        // Block common internal network ranges
+        const hostname = url.hostname.toLowerCase();
+        if (
+          hostname === 'localhost' ||
+          hostname === '127.0.0.1' ||
+          hostname.startsWith('10.') ||
+          hostname.startsWith('172.16.') ||
+          hostname.startsWith('192.168.') ||
+          hostname === '169.254.169.254' // AWS metadata
+        ) {
+          throw new Error('Internal network URLs are not allowed');
+        }
+
         let fetch;
         try {
           fetch = (await import('node-fetch')).default;
         } catch {
           fetch = globalThis.fetch;
         }
-        const response = await fetch(abiUrl);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch ABI from URL: ${response.statusText}`);
+        
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        
+        let abiData;
+        try {
+          const response = await fetch(abiUrl, { 
+            signal: controller.signal,
+            headers: { 'User-Agent': 'AutoFi-Backend' }
+          });
+          clearTimeout(timeout);
+        
+          if (!response.ok) {
+            throw new Error(`Failed to fetch ABI from URL: ${response.statusText}`);
+          }
+          
+          abiData = await response.json();
+        } catch (error) {
+          clearTimeout(timeout);
+          if (error.name === 'AbortError') {
+            throw new Error('ABI fetch timeout after 5 seconds');
+          }
+          throw error;
         }
-        const abiData = await response.json();
+        
         parsedAbi = Array.isArray(abiData) ? abiData : (abiData.abi || abiData.result || abiData);
       } else {
         parsedAbi = typeof abi === 'string' ? JSON.parse(abi) : abi;
@@ -152,7 +202,7 @@ export function createApiRoutes(automationSystem = null) {
       receive: null
     };
     
-    if (includeAnalysis) {
+    if (includeAnalysisFlag) {
       parsedAbi.forEach(item => {
         if (item.type === 'function') {
           contractInfo.functions.push({
@@ -202,14 +252,14 @@ export function createApiRoutes(automationSystem = null) {
       }
     }
     
-    if (includeMetadata || includeBytecode) {
+    if (includeMetadataFlag || includeBytecodeFlag) {
       try {
         const bytecode = await client.publicClient.getBytecode({ address });
-        contractInfo.bytecode = includeBytecode ? bytecode : undefined;
+        contractInfo.bytecode = includeBytecodeFlag ? bytecode : undefined;
         contractInfo.isContract = bytecode && bytecode !== '0x' && bytecode.length > 2;
         contractInfo.bytecodeLength = bytecode ? (bytecode.length - 2) / 2 : 0;
         
-        if (includeMetadata && contractInfo.isContract) {
+        if (includeMetadataFlag && contractInfo.isContract) {
           try {
             const blockNumber = await client.publicClient.getBlockNumber();
             contractInfo.currentBlock = blockNumber.toString();
@@ -327,14 +377,9 @@ export function createApiRoutes(automationSystem = null) {
 
   router.post('/testing/collections/:collectionId/tests/:testId/run', strictRateLimiter, asyncHandler(async (req, res) => {
     const { collectionId, testId } = req.params;
-    const result = {
-      id: testId,
-      testName: `Test ${testId}`,
-      success: Math.random() > 0.2,
-      status: Math.random() > 0.2 ? 'passed' : 'failed',
-      duration: Math.floor(Math.random() * 1000) + 100,
-      timestamp: DEFAULT_TIMESTAMP(),
-    };
+    const { environmentId } = req.query;
+    
+    const result = await postmanProtocol.runTest(collectionId, testId, environmentId || null);
     res.json(createSuccessResponse({ result }));
   }));
 

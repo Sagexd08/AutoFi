@@ -17,25 +17,30 @@ let celoClient: CeloClient | undefined;
 let agent: LangChainAgent | undefined;
 let orchestrator: WorkflowOrchestrator | undefined;
 
-if (process.env.CELO_PRIVATE_KEY) {
-  celoClient = new CeloClient({
-    privateKey: process.env.CELO_PRIVATE_KEY,
-    network: (process.env.CELO_NETWORK as 'alfajores' | 'mainnet') || 'alfajores',
-    rpcUrl: process.env.CELO_RPC_URL,
-  });
+// Initialize asynchronously
+(async () => {
+  if (process.env.CELO_PRIVATE_KEY) {
+    celoClient = new CeloClient({
+      privateKey: process.env.CELO_PRIVATE_KEY,
+      network: (process.env.CELO_NETWORK as 'alfajores' | 'mainnet') || 'alfajores',
+      rpcUrl: process.env.CELO_RPC_URL,
+    });
 
-  agent = new LangChainAgent({
-    id: 'main',
-    type: 'langchain',
-    name: 'Celo Automator Agent',
-    model: process.env.AI_MODEL || 'gemini-1.5-flash',
-    geminiApiKey: process.env.GEMINI_API_KEY,
-    openaiApiKey: process.env.OPENAI_API_KEY,
-    celoClient,
-  });
+    agent = await LangChainAgent.create({
+      id: 'main',
+      type: 'langchain',
+      name: 'Celo Automator Agent',
+      model: process.env.AI_MODEL || 'gemini-1.5-flash',
+      geminiApiKey: process.env.GEMINI_API_KEY,
+      openaiApiKey: process.env.OPENAI_API_KEY,
+      celoClient,
+    });
 
-  orchestrator = new WorkflowOrchestrator(agent);
-}
+    orchestrator = new WorkflowOrchestrator(agent);
+  }
+})().catch((error) => {
+  console.error('Failed to initialize agent:', error);
+});
 
 // Create workflow from natural language
 router.post('/interpret', async (req, res, next) => {

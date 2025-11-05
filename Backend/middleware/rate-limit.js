@@ -26,9 +26,8 @@ export function createRateLimiter(options = {}) {
           message,
           timestamp: new Date().toISOString(),
           retryAfter: req.rateLimit?.resetTime 
-            ? Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000) 
-            : Math.ceil(windowMs / 1000),
-        },
+            ? Math.max(0, Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000))
+            : Math.ceil(windowMs / 1000),        },
       });
     },
   });

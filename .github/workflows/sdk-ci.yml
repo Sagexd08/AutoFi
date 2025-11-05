@@ -3,6 +3,7 @@ name: Build and Test
 on:
   push:
     branches: [ main, develop ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main, develop ]
 
@@ -86,35 +87,34 @@ jobs:
   publish:
     needs: [test, build]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/v')
+
     steps:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    
+
     - name: Use Node.js
       uses: actions/setup-node@v3
       with:
         node-version: '18'
         registry-url: 'https://registry.npmjs.org'
-    
+
     - name: Install dependencies
       working-directory: Backend/sdk
       run: npm ci
-    
+
     - name: Run tests
       working-directory: Backend/sdk
       run: npm test
-    
+
     - name: Build
       working-directory: Backend/sdk
       run: npm run build
-    
+
     - name: Publish to NPM
       working-directory: Backend/sdk
       run: npm publish
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      if: contains(github.ref, 'refs/tags/v')
 

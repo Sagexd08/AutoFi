@@ -4,7 +4,6 @@
  */
 
 import fetch from 'node-fetch';
-import https from 'https';
 
 export class GasEstimationService {
   constructor(config = {}) {
@@ -50,9 +49,8 @@ export class GasEstimationService {
       let hexValue = '0x0';
       if (value && value !== '0') {
         try {
-          // Convert decimal string to integer if needed
-          const numValue = parseInt(value, 10);
-          hexValue = `0x${BigInt(numValue).toString(16)}`;
+          // Convert decimal string to BigInt directly (handles large numbers without precision loss)
+          hexValue = `0x${BigInt(value).toString(16)}`;
         } catch (err) {
           hexValue = '0x0';
         }
@@ -132,13 +130,8 @@ export class GasEstimationService {
         return null;
       }
 
-      const agent = new https.Agent({
-        rejectUnauthorized: false
-      });
-
       const response = await fetch(
-        `${this.etherscanUrl}?module=gastracker&action=gasoracle&apikey=${this.etherscanApiKey}`,
-        { agent }
+        `${this.etherscanUrl}?module=gastracker&action=gasoracle&apikey=${this.etherscanApiKey}`
       );
 
       const result = await response.json();
@@ -220,11 +213,11 @@ export class GasEstimationService {
           estimatedCost: estimatedCostEth.toFixed(6)
         },
         fast: {
-          gasPrice: Math.floor(baseGasPrice * 1.25).toString(),
+          gasPrice: (baseGasPrice * 1.25).toString(),
           estimatedCost: (estimatedCostEth * 1.25).toFixed(6)
         },
         instant: {
-          gasPrice: Math.floor(baseGasPrice * 1.5).toString(),
+          gasPrice: (baseGasPrice * 1.5).toString(),
           estimatedCost: (estimatedCostEth * 1.5).toFixed(6)
         }
       }
@@ -244,8 +237,8 @@ export class GasEstimationService {
       transaction: transactionCost,
       tracker: gasTracker || {
         standard: transactionCost.gasPrice,
-        fast: Math.floor(Number(transactionCost.gasPrice) * 1.25).toString(),
-        instant: Math.floor(Number(transactionCost.gasPrice) * 1.5).toString()
+        fast: (Number(transactionCost.gasPrice) * 1.25).toString(),
+        instant: (Number(transactionCost.gasPrice) * 1.5).toString()
       },
       timestamp: new Date().toISOString()
     };

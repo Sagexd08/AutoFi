@@ -10,6 +10,7 @@ export class EtherscanService {
     this.apiKey = config.apiKey || process.env.ETHERSCAN_API_KEY;
     this.network = config.network || 'alfajores';
     this.baseUrl = this.getBaseUrl();
+    this.timeout = config.timeout || 10000; // Default 10 seconds
   }
 
   getBaseUrl() {
@@ -22,12 +23,59 @@ export class EtherscanService {
   }
 
   /**
+   * Fetch with timeout using AbortController
+   */
+  async fetchWithTimeout(url, options = {}) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Validate and normalize Ethereum address
+   * @param {string} address - Address to validate and normalize
+   * @returns {string} - Normalized address (lowercase, with 0x prefix)
+   * @throws {Error} - If address is invalid
+   */
+  validateAndNormalizeAddress(address) {
+    if (!address || typeof address !== 'string') {
+      throw new Error('Address must be a non-empty string');
+    }
+
+    const trimmed = address.trim();
+    const withPrefix = trimmed.startsWith('0x') ? trimmed : `0x${trimmed}`;
+
+    const addressRegex = /^0x[a-fA-F0-9]{40}$/;
+    if (!addressRegex.test(withPrefix)) {
+      throw new Error(`Invalid address format: "${address}". Expected 0x followed by 40 hexadecimal characters.`);
+    }
+
+    return withPrefix.toLowerCase();
+  }
+
+  /**
    * Get account balance
    */
   async getBalance(address) {
     try {
-      const response = await fetch(
-        `${this.baseUrl}?module=account&action=balance&address=${address}&tag=latest&apikey=${this.apiKey}`
+      const normalizedAddress = this.validateAndNormalizeAddress(address);
+
+      const response = await this.fetchWithTimeout(
+        `${this.baseUrl}?module=account&action=balance&address=${normalizedAddress}&tag=latest&apikey=${this.apiKey}`
       );
       const result = await response.json();
       if (result.status === '1') {
@@ -35,6 +83,10 @@ export class EtherscanService {
       }
       throw new Error(result.message || 'Failed to get balance');
     } catch (error) {
+      if (error.message.includes('Invalid address format') || error.message.includes('must be a non-empty string')) {
+        console.warn(`Etherscan balance validation error: ${error.message}`);
+        return null;
+      }
       console.error('Etherscan balance error:', error);
       return null;
     }
@@ -45,7 +97,7 @@ export class EtherscanService {
    */
   async getTransactions(address, startBlock = 0, endBlock = 99999999, sort = 'desc') {
     try {
-      const response = await fetch(
+      const response = await this.fetchWithTimeout(
         `${this.baseUrl}?module=account&action=txlist&address=${address}&startblock=${startBlock}&endblock=${endBlock}&sort=${sort}&apikey=${this.apiKey}`
       );
       const result = await response.json();
@@ -64,7 +116,7 @@ export class EtherscanService {
    */
   async getInternalTransactions(address) {
     try {
-      const response = await fetch(
+      const response = await this.fetchWithTimeout(
         `${this.baseUrl}?module=account&action=txlistinternal&address=${address}&apikey=${this.apiKey}`
       );
       const result = await response.json();
@@ -89,7 +141,7 @@ export class EtherscanService {
       }
       url += `&apikey=${this.apiKey}`;
 
-      const response = await fetch(url);
+      const response = await this.fetchWithTimeout(url);
       const result = await response.json();
       if (result.status === '1') {
         return result.result;
@@ -105,8 +157,11 @@ export class EtherscanService {
    * Get transaction receipt status
    */
   async getTransactionStatus(txHash) {
+    if (!txHash || typeof txHash !== 'string' || !/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
+      throw new Error('Invalid transaction hash format');
+    }
     try {
-      const response = await fetch(
+      const response = await this.fetchWithTimeout(
         `${this.baseUrl}?module=transaction&action=gettxreceiptstatus&txhash=${txHash}&apikey=${this.apiKey}`
       );
       const result = await response.json();
@@ -122,13 +177,12 @@ export class EtherscanService {
       return null;
     }
   }
-
   /**
    * Get contract ABI
    */
   async getContractABI(contractAddress) {
     try {
-      const response = await fetch(
+      const response = await this.fetchWithTimeout(
         `${this.baseUrl}?module=contract&action=getabi&address=${contractAddress}&apikey=${this.apiKey}`
       );
       const result = await response.json();
@@ -147,7 +201,7 @@ export class EtherscanService {
    */
   async getContractSourceCode(contractAddress) {
     try {
-      const response = await fetch(
+      const response = await this.fetchWithTimeout(
         `${this.baseUrl}?module=contract&action=getsourcecode&address=${contractAddress}&apikey=${this.apiKey}`
       );
       const result = await response.json();
@@ -166,7 +220,7 @@ export class EtherscanService {
    */
   async getGasTracker() {
     try {
-      const response = await fetch(
+      const response = await this.fetchWithTimeout(
         `${this.baseUrl}?module=gastracker&action=gasoracle&apikey=${this.apiKey}`
       );
       const result = await response.json();
@@ -185,7 +239,7 @@ export class EtherscanService {
    */
   async getBlockInfo(blockNumber) {
     try {
-      const response = await fetch(
+      const response = await this.fetchWithTimeout(
         `${this.baseUrl}?module=proxy&action=eth_getBlockByNumber&tag=${blockNumber}&boolean=true&apikey=${this.apiKey}`
       );
       const result = await response.json();

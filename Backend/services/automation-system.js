@@ -87,7 +87,7 @@ export class CombinedAutomationSystem extends EventEmitter {
     this.initializeGasEstimationService();
     this.initializeEtherscanService();
     this.initializeBlockchainAPI();
-    this.initializeLangChain();
+    this._langChainInitializationPromise = this.initializeLangChain();
     this.initializeBlockchainInterface();
     this.initializeSupabase();
     this.initializeAgentSystems();
@@ -305,11 +305,11 @@ export class CombinedAutomationSystem extends EventEmitter {
     }
   }
 
-  initializeLangChain() {
+  async initializeLangChain() {
     try {
 
       this.consolidatedAgentSystem = new ConsolidatedAgentSystem(this, this.config.geminiApiKey);
-      this.consolidatedAgentSystem.attachLangChainAgent();
+      await this.consolidatedAgentSystem.attachLangChainAgent();
       this.langChainAgent = this.consolidatedAgentSystem.langChainAgent;
       console.log('✅ LangChain agent initialized via ConsolidatedAgentSystem');
     } catch (error) {

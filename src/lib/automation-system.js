@@ -33,7 +33,7 @@ export class AutomationSystem {
     this.initializeDatabase();
     this.initializeWalletAccount();
     this.initializeBlockchainClients();
-    this.initializeLangChainAgent();
+    this._langChainInitializationPromise = this.initializeLangChainAgent();
     this.initializeTransactionTracker();
     this.initializeGasEstimationService();
     this.initializeEtherscanService();
@@ -61,6 +61,50 @@ export class AutomationSystem {
     };
   }
 
+  /**
+   * Sanitizes an object for logging by redacting sensitive keys.
+   * Handles nested objects and arrays, and does not mutate the original object.
+   * @param {any} obj - The object to sanitize
+   * @returns {any} - A sanitized copy of the object
+   */
+  sanitizeForLog(obj) {
+    if (obj === null || obj === undefined) {
+      return obj;
+    }
+
+    // List of sensitive keys to redact (case-insensitive)
+    const sensitiveKeys = ['privateKey', 'password', 'secret', 'apiKey', 'token', 'auth', 'private', 'key', 'credentials', 'passphrase'];
+
+    // Check if a key is sensitive
+    const isSensitiveKey = (key) => {
+      const lowerKey = key.toLowerCase();
+      return sensitiveKeys.some(sensitiveKey => lowerKey.includes(sensitiveKey.toLowerCase()));
+    };
+
+    // Handle arrays
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.sanitizeForLog(item));
+    }
+
+    // Handle plain objects
+    if (typeof obj === 'object' && obj.constructor === Object) {
+      const sanitized = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (isSensitiveKey(key)) {
+          sanitized[key] = '[REDACTED]';
+        } else if (typeof value === 'object' && value !== null) {
+          sanitized[key] = this.sanitizeForLog(value);
+        } else {
+          sanitized[key] = value;
+        }
+      }
+      return sanitized;
+    }
+
+    // Return primitive values as-is
+    return obj;
+  }
+
   initializeWalletAccount() {
     try {
       if (this.config.privateKey && this.config.privateKey !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
@@ -74,9 +118,9 @@ export class AutomationSystem {
     }
   }
 
-  initializeLangChainAgent() {
+  async initializeLangChainAgent() {
     try {
-      this.langChainAgent = new LangChainAgent({
+      this.langChainAgent = await LangChainAgent.create({
         geminiApiKey: this.config.geminiApiKey,
         privateKey: this.config.privateKey,
         network: this.config.network,
@@ -1338,7 +1382,7 @@ Response:
         this.validateFunctionParameters(functionName, params);
 
         // Log the function call for debugging
-        console.log(`📞 Function call: ${functionName}`, JSON.stringify(params).substring(0, 100));
+        console.log(`📞 Function call: ${functionName}`, JSON.stringify(this.sanitizeForLog(params)).substring(0, 100));
 
         let result;
         const txHash = '0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');

@@ -5,6 +5,9 @@
 
 export class TransactionTracker {
   constructor(broadcastFn) {
+    if (typeof broadcastFn !== 'function') {
+      throw new TypeError('broadcastFn must be a function');
+    }
     this.broadcastFn = broadcastFn;
     this.transactions = new Map(); // Track all transactions
     this.transactionSubscribers = new Map(); // Track subscribers per tx
@@ -12,7 +15,6 @@ export class TransactionTracker {
     this.maxRetries = 60; // Max 5 minutes of polling
     this.pollingIntervals = new Map();
   }
-
   /**
    * Register a new transaction for tracking
    */
@@ -76,10 +78,16 @@ export class TransactionTracker {
           this.stopPollingTransaction(txHash);
         }
 
-        tx.retries++;
-        if (tx.retries >= this.maxRetries) {
-          this.stopPollingTransaction(txHash);
-          console.warn(`⚠️ Transaction ${txHash} polling timeout after ${this.maxRetries} retries`);
+        // Get the currently stored transaction (which may have been updated above)
+        const currentTx = this.transactions.get(txHash);
+        if (currentTx) {
+          currentTx.retries++;
+          this.transactions.set(txHash, currentTx);
+          
+          if (currentTx.retries >= this.maxRetries) {
+            this.stopPollingTransaction(txHash);
+            console.warn(`⚠️ Transaction ${txHash} polling timeout after ${this.maxRetries} retries`);
+          }
         }
       } catch (error) {
         console.error(`Error polling transaction ${txHash}:`, error);
