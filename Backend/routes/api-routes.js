@@ -103,20 +103,151 @@ export function createApiRoutes(automationSystem = null) {
 
   router.get('/contracts/:address', standardRateLimiter, asyncHandler(async (req, res) => {
     const { address } = req.params;
-    const { abi, chainId = DEFAULT_CHAIN_ID } = req.query;
+    const { abi, abiUrl, chainId = DEFAULT_CHAIN_ID, includeBytecode = false, includeMetadata = true, includeAnalysis = true } = req.query;
     
     validateAddress(address);
-    validateRequired({ abi }, ['abi']);
+    
+    if (!abi && !abiUrl) {
+      return res.status(400).json(createErrorResponse(400, 'Either abi or abiUrl query parameter is required'));
+    }
     
     let parsedAbi;
     try {
-      parsedAbi = JSON.parse(abi);
+      if (abiUrl) {
+        let fetch;
+        try {
+          fetch = (await import('node-fetch')).default;
+        } catch {
+          fetch = globalThis.fetch;
+        }
+        const response = await fetch(abiUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ABI from URL: ${response.statusText}`);
+        }
+        const abiData = await response.json();
+        parsedAbi = Array.isArray(abiData) ? abiData : (abiData.abi || abiData.result || abiData);
+      } else {
+        parsedAbi = typeof abi === 'string' ? JSON.parse(abi) : abi;
+      }
+      
+      if (!Array.isArray(parsedAbi)) {
+        throw new Error('ABI must be an array');
+      }
     } catch (error) {
-      return res.status(400).json(createErrorResponse(400, 'Invalid ABI JSON'));
+      return res.status(400).json(createErrorResponse(400, `Invalid ABI: ${error.message}`));
+    }
+    
+    const client = await multiChainConfig.createChainClient(chainId);
+    
+    const contractInfo = {
+      address: address.toLowerCase(),
+      chainId,
+      abi: parsedAbi,
+      standard: null,
+      functions: [],
+      events: [],
+      errors: [],
+      constructor: null,
+      fallback: null,
+      receive: null
+    };
+    
+    if (includeAnalysis) {
+      parsedAbi.forEach(item => {
+        if (item.type === 'function') {
+          contractInfo.functions.push({
+            name: item.name,
+            inputs: item.inputs || [],
+            outputs: item.outputs || [],
+            stateMutability: item.stateMutability || 'nonpayable',
+            payable: item.stateMutability === 'payable',
+            view: item.stateMutability === 'view' || item.stateMutability === 'pure',
+            constant: item.constant || false
+          });
+        } else if (item.type === 'event') {
+          contractInfo.events.push({
+            name: item.name,
+            inputs: item.inputs || [],
+            anonymous: item.anonymous || false
+          });
+        } else if (item.type === 'error') {
+          contractInfo.errors.push({
+            name: item.name,
+            inputs: item.inputs || []
+          });
+        } else if (item.type === 'constructor') {
+          contractInfo.constructor = {
+            inputs: item.inputs || [],
+            payable: item.stateMutability === 'payable'
+          };
+        } else if (item.type === 'fallback') {
+          contractInfo.fallback = {
+            stateMutability: item.stateMutability || 'nonpayable',
+            payable: item.stateMutability === 'payable'
+          };
+        } else if (item.type === 'receive') {
+          contractInfo.receive = {
+            stateMutability: 'payable'
+          };
+        }
+      });
+      
+      const functionNames = contractInfo.functions.map(f => f.name);
+      if (functionNames.includes('balanceOf') && functionNames.includes('transfer') && functionNames.includes('transferFrom')) {
+        contractInfo.standard = 'ERC20';
+      } else if (functionNames.includes('tokenURI') && functionNames.includes('safeTransferFrom')) {
+        contractInfo.standard = 'ERC721';
+      } else if (functionNames.includes('supportsInterface')) {
+        contractInfo.standard = 'ERC165';
+      }
+    }
+    
+    if (includeMetadata || includeBytecode) {
+      try {
+        const bytecode = await client.publicClient.getBytecode({ address });
+        contractInfo.bytecode = includeBytecode ? bytecode : undefined;
+        contractInfo.isContract = bytecode && bytecode !== '0x' && bytecode.length > 2;
+        contractInfo.bytecodeLength = bytecode ? (bytecode.length - 2) / 2 : 0;
+        
+        if (includeMetadata && contractInfo.isContract) {
+          try {
+            const blockNumber = await client.publicClient.getBlockNumber();
+            contractInfo.currentBlock = blockNumber.toString();
+            
+            try {
+              const balance = await client.publicClient.getBalance({ address });
+              contractInfo.balance = balance.toString();
+              contractInfo.balanceFormatted = (Number(balance) / 1e18).toFixed(6);
+            } catch {}
+            
+            const deployedContracts = await contractFactory.getDeployedContracts(chainId);
+            const deploymentInfo = deployedContracts.find(c => 
+              c.contractAddress?.toLowerCase() === address.toLowerCase()
+            );
+            
+            if (deploymentInfo) {
+              contractInfo.deploymentInfo = {
+                txHash: deploymentInfo.txHash,
+                blockNumber: deploymentInfo.blockNumber,
+                gasUsed: deploymentInfo.gasUsed,
+                deployedAt: deploymentInfo.deploymentTime
+              };
+            }
+          } catch (error) {
+            contractInfo.metadataError = error.message;
+          }
+        }
+      } catch (error) {
+        contractInfo.bytecodeError = error.message;
+        contractInfo.isContract = false;
+      }
     }
     
     const contract = await contractFactory.getContract(address, parsedAbi, chainId);
-    res.json(createSuccessResponse({ contract }));
+    contractInfo.contract = contract;
+    
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.json(createSuccessResponse({ contract: contractInfo }));
   }));
 
   router.get('/monitoring/system', standardRateLimiter, asyncHandler(async (req, res) => {
