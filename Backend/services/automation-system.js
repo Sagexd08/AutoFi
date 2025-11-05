@@ -540,8 +540,13 @@ export class CombinedAutomationSystem extends EventEmitter {
 
   async callCeloFunction(functionName, parameters) {
     const { [functionName]: func, createCeloAgent } = await import('../blockchain/packages/core/dist/functions/celo-functions.js');
+    
+    if (!this.config.privateKey) {
+      throw new Error('Private key is required for Celo function calls. Set PRIVATE_KEY environment variable.');
+    }
+    
     const client = createCeloAgent({
-      privateKey: this.config.privateKey || '0x0000000000000000000000000000000000000000000000000000000000000000',
+      privateKey: this.config.privateKey,
       network: this.config.network,
       rpcUrl: this.config.rpcUrl
     });

@@ -44,7 +44,7 @@ export class AutomationSystem {
   mergeConfig(config) {
     return {
       port: config.port || process.env.PORT || 3001,
-      geminiApiKey: config.geminiApiKey || process.env.GEMINI_API_KEY || 'AIzaSyCKFLkomLb78CSBz4FA36VS9Vb789fZ8qc',
+      geminiApiKey: config.geminiApiKey || process.env.GEMINI_API_KEY,
       privateKey: config.privateKey || process.env.PRIVATE_KEY,
       network: config.network || process.env.NETWORK || 'alfajores',
       rpcUrl: config.rpcUrl || process.env.RPC_URL || 'https://alfajores-forno.celo-testnet.org',
@@ -422,8 +422,13 @@ export class AutomationSystem {
 
   async callCeloFunction(functionName, parameters) {
     const { [functionName]: func, createCeloAgent } = await import('../blockchain/packages/core/dist/functions/celo-functions.js');
+    
+    if (!this.config.privateKey) {
+      throw new Error('Private key is required for Celo function calls. Set PRIVATE_KEY environment variable.');
+    }
+    
     const client = createCeloAgent({
-      privateKey: this.config.privateKey || '0x0000000000000000000000000000000000000000000000000000000000000000',
+      privateKey: this.config.privateKey,
       network: this.config.network,
       rpcUrl: this.config.rpcUrl
     });
