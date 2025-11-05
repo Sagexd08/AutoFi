@@ -29,13 +29,13 @@ const config: HardhatUserConfig = {
       chainId: 42220,
     },
     sepolia: {
-      url: "https://eth-sepolia.g.alchemy.com/v2/1a3ETMqJJ0QMjFNP2Z6GNdp1mCsxNpEO",
-      accounts: ["ea988f9144ae3f162df531b665a4c4be421253fda546cb22eae2cf4c43ce67b7"],
+      url: process.env.SEPOLIA_RPC_URL || "https://rpc.sepolia.org",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 11155111,
     },
     celoSepolia: {
-      url: "https://rpc.sepolia.org",
-      accounts: ["ea988f9144ae3f162df531b665a4c4be421253fda546cb22eae2cf4c43ce67b7"],
+      url: process.env.CELO_SEPOLIA_RPC_URL || "https://rpc.sepolia.org",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 11155111,
     },
   },
