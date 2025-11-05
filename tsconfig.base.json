@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "allowSyntheticDefaultImports": true,
+    "paths": {
+      "@celo-automator/types": ["./packages/types/src"],
+      "@celo-automator/core": ["./packages/core/src"],
+      "@celo-automator/langchain-agent": ["./packages/langchain-agent/src"],
+      "@celo-automator/celo-functions": ["./packages/celo-functions/src"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "build", ".next"]
+}
