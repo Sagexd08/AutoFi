@@ -1,4 +1,6 @@
 import { body, param, validationResult } from 'express-validator';
+import logger from '../utils/logger.js';
+import { getRequestId } from '../utils/request-id.js';
 
 const TOOL_SCHEMAS = {
   'sdk_initialize': {
@@ -227,10 +229,11 @@ export function validateToolExecution(automationSystem) {
             message: err.msg
           }));
           
-          console.error('⚠️  Validation failed:', {
+          logger.error('Validation failed', {
             toolId: req.params.toolId,
             errors: errorMessages,
             ip: req.ip,
+            requestId: getRequestId(req),
             timestamp: new Date().toISOString()
           });
           
@@ -249,9 +252,10 @@ export function validateToolExecution(automationSystem) {
         
         const tool = automationSystem.environmentManager.getTool(toolId);
         if (!tool) {
-          console.error('⚠️  Tool not found:', {
+          logger.error('Tool not found', {
             toolId,
             ip: req.ip,
+            requestId: getRequestId(req),
             timestamp: new Date().toISOString()
           });
           
@@ -264,10 +268,11 @@ export function validateToolExecution(automationSystem) {
           for (const requiredParam of schema.required) {
             if (!(requiredParam in parameters)) {
               const errorMsg = `Missing required parameter: ${requiredParam}`;
-              console.error('⚠️  Validation failed:', {
+              logger.error('Validation failed', {
                 toolId,
                 error: errorMsg,
                 ip: req.ip,
+                requestId: getRequestId(req),
                 timestamp: new Date().toISOString()
               });
               
@@ -284,11 +289,12 @@ export function validateToolExecution(automationSystem) {
           const unknownParams = providedParams.filter(param => !allowedParams.includes(param));
           if (unknownParams.length > 0) {
             const errorMsg = `Unknown parameters: ${unknownParams.join(', ')}. Allowed: ${allowedParams.join(', ') || 'none'}`;
-            console.error('⚠️  Validation failed:', {
+            logger.error('Validation failed', {
               toolId,
               error: errorMsg,
               unknownParams,
               ip: req.ip,
+              requestId: getRequestId(req),
               timestamp: new Date().toISOString()
             });
             
@@ -320,10 +326,11 @@ export function validateToolExecution(automationSystem) {
           }
           
           if (validationErrors.length > 0) {
-            console.error('⚠️  Validation failed:', {
+            logger.error('Validation failed', {
               toolId,
               errors: validationErrors,
               ip: req.ip,
+              requestId: getRequestId(req),
               timestamp: new Date().toISOString()
             });
             
@@ -335,9 +342,10 @@ export function validateToolExecution(automationSystem) {
           
           req.body.parameters = sanitizedParameters;
         } else {
-          console.warn('⚠️  No schema defined for tool, applying generic validation:', {
+          logger.warn('No schema defined for tool, applying generic validation', {
             toolId,
             ip: req.ip,
+            requestId: getRequestId(req),
             timestamp: new Date().toISOString()
           });
           
@@ -345,10 +353,11 @@ export function validateToolExecution(automationSystem) {
           
           const paramString = JSON.stringify(parameters);
           if (paramString.length > 100000) {
-            console.error('⚠️  Validation failed: Parameters too large:', {
+            logger.error('Validation failed: Parameters too large', {
               toolId,
               size: paramString.length,
               ip: req.ip,
+              requestId: getRequestId(req),
               timestamp: new Date().toISOString()
             });
             
@@ -362,11 +371,12 @@ export function validateToolExecution(automationSystem) {
         next();
         
       } catch (error) {
-        console.error('❌ Validation middleware error:', {
+        logger.error('Validation middleware error', {
           error: error.message,
           stack: error.stack,
           toolId: req.params.toolId,
           ip: req.ip,
+          requestId: getRequestId(req),
           timestamp: new Date().toISOString()
         });
         

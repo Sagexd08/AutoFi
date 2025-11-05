@@ -1,110 +1,139 @@
-export const LogLevel = {
-  DEBUG: 0,
-  INFO: 1,
-  WARN: 2,
-  ERROR: 3,
+import config from '../config/env.js';
+
+/**
+ * Log levels
+ */
+const LOG_LEVELS = {
+  error: 0,
+  warn: 1,
+  info: 2,
+  debug: 3,
+  verbose: 4,
 };
 
-export class Logger {
-  constructor(config = {}) {
-    this.logLevel = config.logLevel || process.env.LOG_LEVEL || 'info';
-    this.levelValue = this.parseLogLevel(this.logLevel);
-    this.correlationId = null;
+const LEVEL_NAMES = Object.keys(LOG_LEVELS);
+
+/**
+ * Get current log level (lazy evaluation to avoid circular dependency)
+ */
+function getCurrentLevel() {
+  try {
+    return LOG_LEVELS[config.LOG_LEVEL] || LOG_LEVELS.info;
+  } catch (error) {
+    // Fallback if config is not yet initialized
+    return LOG_LEVELS.info;
+  }
+}
+
+/**
+ * Structured logger with request ID support
+ */
+class Logger {
+  constructor(context = 'App') {
+    this.context = context;
   }
 
-  parseLogLevel(level) {
-    const levelMap = {
-      debug: LogLevel.DEBUG,
-      info: LogLevel.INFO,
-      warn: LogLevel.WARN,
-      error: LogLevel.ERROR,
-    };
-    return levelMap[level.toLowerCase()] ?? LogLevel.INFO;
+  /**
+   * Create a child logger with a specific context
+   */
+  child(context) {
+    return new Logger(`${this.context}:${context}`);
   }
 
-  setCorrelationId(id) {
-    this.correlationId = id;
-  }
-
-  generateCorrelationId() {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  createLogEntry(level, message, error, context) {
-    return {
-      level,
+  /**
+   * Format log entry
+   */
+  format(level, message, meta = {}) {
+    const timestamp = new Date().toISOString();
+    const logEntry = {
+      timestamp,
+      level: level.toUpperCase(),
+      context: this.context,
       message,
-      timestamp: new Date().toISOString(),
-      correlationId: this.correlationId,
-      ...(context && { context }),
-      ...(error && {
-        error: {
-          message: error.message,
-          stack: error.stack,
-          ...(error.code && { code: error.code }),
-          ...(error.context && { context: error.context }),
-        },
-      }),
+      ...meta,
     };
+
+    if (config.isProduction) {
+      return JSON.stringify(logEntry);
+    }
+
+    // Pretty print for development
+    const colorCodes = {
+      error: '\x1b[31m', // Red
+      warn: '\x1b[33m',  // Yellow
+      info: '\x1b[36m',  // Cyan
+      debug: '\x1b[35m', // Magenta
+      verbose: '\x1b[90m', // Gray
+    };
+    const reset = '\x1b[0m';
+    const color = colorCodes[level] || '';
+
+    return `${color}[${timestamp}] ${level.toUpperCase()}${reset} [${this.context}] ${message}${Object.keys(meta).length ? ' ' + JSON.stringify(meta, null, 2) : ''}`;
   }
 
-  debug(message, context) {
-    if (this.levelValue <= LogLevel.DEBUG) {
-      const entry = this.createLogEntry('DEBUG', message, null, context);
-      console.debug(JSON.stringify(entry));
+  /**
+   * Log message if level is enabled
+   */
+  log(level, message, meta = {}) {
+    const currentLevel = getCurrentLevel();
+    if (LOG_LEVELS[level] <= currentLevel) {
+      const formatted = this.format(level, message, meta);
+      const output = level === 'error' ? console.error : console.log;
+      output(formatted);
     }
   }
 
-  info(message, context) {
-    if (this.levelValue <= LogLevel.INFO) {
-      const entry = this.createLogEntry('INFO', message, null, context);
-      console.info(JSON.stringify(entry));
-    }
+  error(message, meta = {}) {
+    this.log('error', message, meta);
   }
 
-  warn(message, context) {
-    if (this.levelValue <= LogLevel.WARN) {
-      const entry = this.createLogEntry('WARN', message, null, context);
-      console.warn(JSON.stringify(entry));
-    }
+  warn(message, meta = {}) {
+    this.log('warn', message, meta);
   }
 
-  error(message, error, context) {
-    if (this.levelValue <= LogLevel.ERROR) {
-      const entry = this.createLogEntry('ERROR', message, error, context);
-      console.error(JSON.stringify(entry));
-    }
+  info(message, meta = {}) {
+    this.log('info', message, meta);
   }
-}
 
-export function requestLogger(logger) {
-  return (req, res, next) => {
-    const correlationId = req.headers['x-correlation-id'] || logger.generateCorrelationId();
-    logger.setCorrelationId(correlationId);
-    req.correlationId = correlationId;
-    res.setHeader('X-Correlation-Id', correlationId);
+  debug(message, meta = {}) {
+    this.log('debug', message, meta);
+  }
 
-    const startTime = Date.now();
+  verbose(message, meta = {}) {
+    this.log('verbose', message, meta);
+  }
 
-    logger.info('Request started', {
+  /**
+   * Log HTTP request
+   */
+  request(req, res, responseTime) {
+    if (!config.ENABLE_REQUEST_LOGGING) return;
+
+    const meta = {
       method: req.method,
-      url: req.url,
-      ip: req.ip,
+      path: req.path,
+      statusCode: res.statusCode,
+      responseTime: `${responseTime}ms`,
+      requestId: req.id || 'unknown',
+      ip: req.ip || req.connection?.remoteAddress,
       userAgent: req.get('user-agent'),
-    });
+    };
 
-    res.on('finish', () => {
-      const duration = Date.now() - startTime;
-      logger.info('Request completed', {
-        method: req.method,
-        url: req.url,
-        statusCode: res.statusCode,
-        duration: `${duration}ms`,
-      });
-    });
-
-    next();
-  };
+    const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
+    this.log(level, `${req.method} ${req.path} ${res.statusCode}`, meta);
+  }
 }
 
-export const logger = new Logger();
+/**
+ * Create logger instance
+ */
+export function createLogger(context) {
+  return new Logger(context);
+}
+
+/**
+ * Default logger instance
+ */
+export const logger = createLogger('App');
+
+export default logger;

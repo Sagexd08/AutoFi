@@ -1,4 +1,6 @@
 
+import logger from '../utils/logger.js';
+
 export class TransactionTracker {
   constructor(broadcastFn) {
     this.broadcastFn = broadcastFn;
@@ -67,10 +69,10 @@ export class TransactionTracker {
         tx.retries++;
         if (tx.retries >= this.maxRetries) {
           this.stopPollingTransaction(txHash);
-          console.warn(`⚠️ Transaction ${txHash} polling timeout after ${this.maxRetries} retries`);
+          logger.warn('Transaction polling timeout', { txHash, retries: this.maxRetries });
         }
       } catch (error) {
-        console.error(`Error polling transaction ${txHash}:`, error);
+        logger.error('Error polling transaction', { txHash, error: error.message, stack: error.stack });
       }
     };
 
@@ -136,7 +138,7 @@ export class TransactionTracker {
       try {
         callback(update);
       } catch (error) {
-        console.error('Error in transaction subscriber:', error);
+        logger.error('Error in transaction subscriber', { txHash, error: error.message, stack: error.stack });
       }
     });
   }

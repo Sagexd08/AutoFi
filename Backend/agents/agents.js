@@ -11,13 +11,13 @@ import {
 import { z } from 'zod';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import 'dotenv/config';
-// LangChain imports (embedded LangChainAgent)
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatOpenAI } from '@langchain/openai';
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
 import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
 import { EventEmitter } from 'events';
+import logger from '../utils/logger.js';
 
 // ---------------------------------------------------------------------------
 // Embedded LangChainAgent
@@ -131,7 +131,7 @@ class LangChainAgent {
       this.memory.chatHistory = this.memory.chatHistory.slice(-10);
       return { success: true, output: response.content, intermediateSteps: [] };
     } catch (error) {
-      console.error('LangChain agent error:', error);
+      logger.error('LangChain agent error', { error: error.message, stack: error.stack });
       return { success: false, error: error.message, output: 'I encountered an error processing your request.' };
     }
   }
@@ -624,9 +624,9 @@ export class ConsolidatedAgentSystem extends EventEmitter {
           this.langChainAgent.updateToolsWithInterface(this.automationSystem.blockchainInterface);
         }
 
-        console.log('✅ LangChainAgent attached to ConsolidatedAgentSystem');
+        logger.info('LangChainAgent attached to ConsolidatedAgentSystem');
       } catch (e) {
-        console.warn('⚠️ Failed to attach LangChainAgent:', e.message || e);
+        logger.warn('Failed to attach LangChainAgent', { error: e.message || e });
       }
     }
   }
@@ -1225,7 +1225,7 @@ If no function calls are needed, set "functionCalls" to an empty array.`;
 
   async start() {
     if (this.isRunning) {
-      console.log('Consolidated Agent System is already running');
+      logger.info('Consolidated Agent System is already running');
       return;
     }
 
@@ -1233,8 +1233,7 @@ If no function calls are needed, set "functionCalls" to an empty array.`;
     await this.mcpServer.connect(transport);
     this.isRunning = true;
     
-    console.log('🤖 Consolidated Agent System started');
-    console.log(`📊 Initialized ${this.agents.size} agents`);
+    logger.info('Consolidated Agent System started', { agentsCount: this.agents.size });
   }
 
   async stop() {
@@ -1244,7 +1243,7 @@ If no function calls are needed, set "functionCalls" to an empty array.`;
 
     await this.mcpServer.close();
     this.isRunning = false;
-    console.log('🛑 Consolidated Agent System stopped');
+    logger.info('Consolidated Agent System stopped');
   }
 }
 

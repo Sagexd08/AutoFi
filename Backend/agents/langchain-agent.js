@@ -5,10 +5,11 @@ import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
+import logger from '../utils/logger.js';
 
 // Configure LangSmith with proper API key
 if (!process.env.LANGCHAIN_API_KEY && !process.env.LANGSMITH_API_KEY) {
-  console.warn('LangSmith API key not found in environment variables');
+  logger.warn('LangSmith API key not found in environment variables');
 }
 process.env.LANGCHAIN_API_KEY = process.env.LANGCHAIN_API_KEY || process.env.LANGSMITH_API_KEY;
 process.env.LANGCHAIN_TRACING_V2 = "true";

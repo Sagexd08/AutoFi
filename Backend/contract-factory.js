@@ -5,6 +5,7 @@ import { spawn } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import logger from './utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -218,7 +219,7 @@ module.exports = {
     try {
       return '2000000';
     } catch (error) {
-      console.warn('Gas estimation failed, using default:', error.message);
+      logger.warn('Gas estimation failed, using default', { error: error.message });
       return '2000000';
     }
   }
@@ -332,7 +333,7 @@ module.exports = {
 
   async verifyContract(contractAddress, chainId, constructorArgs = []) {
     try {
-      console.log(`Verifying contract ${contractAddress} on ${chainId}`);
+      logger.debug(`Verifying contract ${contractAddress} on ${chainId}`);
       
       return {
         success: true,

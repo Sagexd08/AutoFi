@@ -1,4 +1,6 @@
 import { EventEmitter } from 'events';
+import logger from '../utils/logger.js';
+
 export class EnvironmentManager extends EventEmitter {
   constructor(config = {}) {
     super();
@@ -20,16 +22,16 @@ export class EnvironmentManager extends EventEmitter {
   }
   async initialize(dependencies = {}) {
     if (this.initialized) {
-      console.warn('⚠️  Environment Manager already initialized');
+      logger.warn('Environment Manager already initialized');
       return;
     }
     try {
-      console.log('🔧 Initializing Environment Manager...');
+      logger.info('Initializing Environment Manager...');
       if (this.config.enableAutoFiSDK && dependencies.autofiSDK) {
         this.autofiSDK = dependencies.autofiSDK;
-        console.log('✅ AutoFi SDK initialized');
+        logger.info('AutoFi SDK initialized');
       } else if (this.config.enableAutoFiSDK === true && !this.autofiSDK) {
-        console.warn('⚠️  AutoFi SDK not provided but enabled');
+        logger.warn('AutoFi SDK not provided but enabled');
       }
       if (dependencies.tools) {
         if (!Array.isArray(dependencies.tools)) {
@@ -39,7 +41,7 @@ export class EnvironmentManager extends EventEmitter {
           try {
             this.registerTool(tool);
           } catch (error) {
-            console.error(`❌ Failed to register tool: ${error.message}`, tool);
+            logger.error(`Failed to register tool: ${error.message}`, { tool });
           }
         });
       }
@@ -51,9 +53,9 @@ export class EnvironmentManager extends EventEmitter {
         toolCount: this.toolRegistry.size,
         sdkEnabled: !!this.autofiSDK
       });
-      console.log(`✅ Environment Manager initialized with ${this.toolRegistry.size} tools`);
+      logger.info(`Environment Manager initialized with ${this.toolRegistry.size} tools`);
     } catch (error) {
-      console.error('❌ Failed to initialize Environment Manager:', error);
+      logger.error('Failed to initialize Environment Manager', { error: error.message });
       this.stats.errors++;
       throw error;
     }
@@ -72,7 +74,7 @@ export class EnvironmentManager extends EventEmitter {
       throw new Error('Tool must have a valid function handler');
     }
     if (this.toolRegistry.has(tool.id)) {
-      console.warn(`⚠️  Tool ${tool.id} already registered, overwriting`);
+      logger.warn(`Tool ${tool.id} already registered, overwriting`);
     }
     this.toolRegistry.set(tool.id, {
       id: tool.id,
@@ -84,14 +86,14 @@ export class EnvironmentManager extends EventEmitter {
       registeredAt: new Date().toISOString()
     });
     this.emit('toolRegistered', { toolId: tool.id, toolName: tool.name });
-    console.log(`📦 Tool registered: ${tool.name} (${tool.id})`);
+    logger.debug(`Tool registered: ${tool.name} (${tool.id})`);
   }
   unregisterTool(toolId) {
     if (this.toolRegistry.has(toolId)) {
       const tool = this.toolRegistry.get(toolId);
       this.toolRegistry.delete(toolId);
       this.emit('toolUnregistered', { toolId, toolName: tool.name });
-      console.log(`🗑️  Tool unregistered: ${tool.name} (${toolId})`);
+      logger.debug(`Tool unregistered: ${tool.name} (${toolId})`);
       return true;
     }
     return false;
@@ -233,7 +235,7 @@ export class EnvironmentManager extends EventEmitter {
   }
   registerSDKMethodsAsTools() {
     if (!this.autofiSDK) {
-      console.warn('⚠️  Cannot register SDK tools: AutoFi SDK not available');
+      logger.warn('Cannot register SDK tools: AutoFi SDK not available');
       return;
     }
     try {
@@ -315,11 +317,11 @@ export class EnvironmentManager extends EventEmitter {
         try {
           this.registerTool(method);
         } catch (error) {
-          console.error(`❌ Failed to register SDK tool ${method.id}:`, error.message);
+          logger.error(`Failed to register SDK tool ${method.id}`, { error: error.message });
         }
       });
     } catch (error) {
-      console.error('❌ Failed to register SDK methods as tools:', error);
+      logger.error('Failed to register SDK methods as tools', { error: error.message });
     }
   }
   getStats() {
@@ -347,4 +349,4 @@ export class EnvironmentManager extends EventEmitter {
     };
   }
 }
-export default EnvironmentManager;
+export default EnvironmentManager;

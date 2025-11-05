@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { EventEmitter } from 'events';
 import MultiChainConfig from './multi-chain-config.js';
+import logger from './utils/logger.js';
 
 export class ProxyServer extends EventEmitter {
   constructor(config = {}) {
@@ -233,7 +234,7 @@ export class ProxyServer extends EventEmitter {
           proxyRes.headers['X-Proxy-Response-Time'] = Date.now() - req.startTime;
         },
         onError: (err, req, res) => {
-          console.error('Proxy error:', err);
+          logger.error('Proxy error', { error: err.message, target: target.id, stack: err.stack });
           this.loadBalancer.markTargetFailure(target.id);
           circuitBreaker?.recordFailure();
           
@@ -249,7 +250,7 @@ export class ProxyServer extends EventEmitter {
       proxy(req, res, next);
       
     } catch (error) {
-      console.error('Proxy middleware error:', error);
+      logger.error('Proxy middleware error', { error: error.message, stack: error.stack });
       res.status(500).json({ 
         error: 'Internal proxy error',
         timestamp: new Date().toISOString()
@@ -286,7 +287,7 @@ export class ProxyServer extends EventEmitter {
     return new Promise((resolve, reject) => {
       try {
         this.server = this.app.listen(this.config.port, this.config.host, () => {
-          console.log(`🚀 Proxy server running on ${this.config.host}:${this.config.port}`);
+          logger.info('Proxy server running', { host: this.config.host, port: this.config.port });
           this.emit('serverStarted', { 
             host: this.config.host, 
             port: this.config.port 
@@ -312,7 +313,7 @@ export class ProxyServer extends EventEmitter {
     return new Promise((resolve) => {
       if (this.server) {
         this.server.close(() => {
-          console.log('🛑 Proxy server stopped');
+          logger.info('Proxy server stopped');
           this.emit('serverStopped');
           resolve();
         });
@@ -331,7 +332,7 @@ export class ProxyServer extends EventEmitter {
           this.loadBalancer.updateTargetHealth(chain.id, health.healthy);
         }
       } catch (error) {
-        console.error('Health check error:', error);
+        logger.error('Health check error', { error: error.message, stack: error.stack });
       }
     }, 30000); // Check every 30 seconds
   }

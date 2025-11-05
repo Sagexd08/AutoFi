@@ -1,69 +1,72 @@
-import { BackendError } from '../utils/errors.js';
+import { AppError, errorHandler as enhancedErrorHandler } from '../utils/errors.js';
+import logger from '../utils/logger.js';
+import { getRequestId } from '../utils/request-id.js';
+import config from '../config/env.js';
 
+/**
+ * Enhanced error handler middleware
+ */
 export function errorHandler(err, req, res, next) {
-  console.error('Error:', {
-    message: err.message,
-    stack: err.stack,
-    code: err.code,
-    context: err.context,
-    url: req.url,
+  const requestId = getRequestId(req);
+  
+  // Log error
+  const logMeta = {
+    requestId,
     method: req.method,
+    path: req.path,
     ip: req.ip,
-  });
+    userAgent: req.get('user-agent'),
+    error: {
+      name: err.name,
+      message: err.message,
+      stack: err.stack,
+      code: err.code,
+      details: err.details,
+    },
+  };
 
-  if (err instanceof BackendError) {
-    const statusCode = getStatusCode(err.code);
-    return res.status(statusCode).json({
-      success: false,
-      error: {
-        code: err.code,
-        message: err.message,
-        context: err.context,
-        recoverable: err.recoverable,
-        timestamp: err.timestamp,
-      },
-    });
+  if (err instanceof AppError) {
+    logger.warn(`Application error: ${err.message}`, logMeta);
+  } else {
+    logger.error(`Unexpected error: ${err.message}`, logMeta);
   }
 
-  if (err.name === 'ZodError' || (err.name === 'ValidationError' && err.errors)) {
+  // Handle Zod validation errors
+  if (err.name === 'ZodError') {
     return res.status(400).json({
       success: false,
       error: {
-        code: 'VALIDATION_ERROR',
         message: 'Validation failed',
-        details: err.errors || err.message,
+        code: 'VALIDATION_ERROR',
+        details: err.errors.map(e => ({
+          path: e.path.join('.'),
+          message: e.message,
+        })),
+        requestId,
         timestamp: new Date().toISOString(),
       },
     });
   }
 
+  // Prepare error response
   const statusCode = err.statusCode || err.status || 500;
-  return res.status(statusCode).json({
+  const response = {
     success: false,
     error: {
-      code: 'INTERNAL_ERROR',
-      message: process.env.NODE_ENV === 'production' 
-        ? 'An internal error occurred' 
-        : err.message,
-      ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
+      message: err.message || 'Internal server error',
+      code: err.code || 'INTERNAL_ERROR',
+      ...(err.details && Object.keys(err.details).length > 0 && { details: err.details }),
+      requestId,
       timestamp: new Date().toISOString(),
     },
-  });
-}
-
-function getStatusCode(code) {
-  const statusMap = {
-    VALIDATION_ERROR: 400,
-    AUTHENTICATION_ERROR: 401,
-    AUTHORIZATION_ERROR: 403,
-    NOT_FOUND: 404,
-    RATE_LIMIT_EXCEEDED: 429,
-    INTERNAL_ERROR: 500,
-    NETWORK_ERROR: 502,
-    SERVICE_UNAVAILABLE: 503,
   };
 
-  return statusMap[code] || 500;
+  // Don't expose stack trace in production
+  if (config.isDevelopment && err.stack) {
+    response.error.stack = err.stack;
+  }
+
+  return res.status(statusCode).json(response);
 }
 
 export function asyncHandler(fn) {

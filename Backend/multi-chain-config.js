@@ -13,6 +13,7 @@ import {
   moonbeam,
   gnosis
 } from 'viem/chains';
+import logger from './utils/logger.js';
 
 export class MultiChainConfig {
   constructor() {
@@ -319,7 +320,7 @@ export class MultiChainConfig {
         
         return rpcUrl;
       } catch (error) {
-        console.warn(`RPC URL failed for ${chainId}: ${rpcUrl}`, error.message);
+        logger.warn('RPC URL failed', { chainId, rpcUrl, error: error.message });
         continue;
       }
     }
@@ -330,7 +331,7 @@ export class MultiChainConfig {
     health.errorCount++;
     health.isHealthy = false;
     
-    console.error(`All RPC URLs failed for chain ${chainId}`);
+    logger.error('All RPC URLs failed for chain', { chainId });
     return chain.rpcUrls[0];
   }
 

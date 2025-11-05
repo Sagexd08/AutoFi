@@ -5,29 +5,27 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import path from 'path';
 import fs from 'fs';
 import { WebSocketServer } from 'ws';
 import http from 'http';
-import { createPublicClient, createWalletClient, http as viem_http, parseEther } from 'viem';
+import { createPublicClient, createWalletClient, http as viem_http } from 'viem';
 import { celo } from 'viem/chains';
 import { TransactionTracker } from './transaction-tracker.js';
 import { GasEstimationService } from './gas-estimation-service.js';
 import { EtherscanService } from './etherscan-service.js';
 import ConsolidatedAgentSystem, { LangChainAgent } from './agents/agents.js';
 import BlockchainInterface from './blockchain-interface.js';
-import SupabaseService from './lib/supabase.js';
 import { MultiChainConfig } from '../multi-chain-config.js';
 import { ProxyServer } from '../proxy-server.js';
 import { ContractFactory } from '../contract-factory.js';
 import { MonitoringSystem } from '../monitoring-system.js';
 import PostmanProtocol from '../postman-protocol.js';
-import apiRoutes from '../routes/api-routes.js';
 import EnvironmentManager from './environment-manager.js';
 import CodeGenerator from './code-generator.js';
 import RebalancerSystem from './rebalancer-system.js';
 import 'dotenv/config';
 import EventEmitter from 'events';
+import logger from '../utils/logger.js';
 
 let CeloMCPServer, AgentOrchestrator, AIAgentSystem;
 try {
@@ -38,7 +36,7 @@ try {
   const aiAgentModule = await import('./agents/ai-agent-system.js');
   AIAgentSystem = aiAgentModule.default;
 } catch (e) {
-  console.warn('⚠️  Advanced agent systems not available, continuing with core features');
+  logger.warn('Advanced agent systems not available, continuing with core features', { error: e.message });
 }
 
 const DEFAULT_ADDRESS = '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEbb';
@@ -89,11 +87,10 @@ export class CombinedAutomationSystem extends EventEmitter {
     this.initializeBlockchainAPI();
     this._langChainInitializationPromise = this.initializeLangChain();
     this.initializeBlockchainInterface();
-    this.initializeSupabase();
     this.initializeAgentSystems();
     this.initializeAdvancedFeatures();
     this.initializeEnhancedFeatures().catch((error) => {
-      console.error('❌ Failed to initialize enhanced features:', error);
+      logger.error('Failed to initialize enhanced features', { error: error.message });
     });
     this.initializeExpress();
   }
@@ -143,7 +140,7 @@ export class CombinedAutomationSystem extends EventEmitter {
         maxOutputTokens: 2048,
       }
     });
-    console.log('✅ Gemini AI initialized');
+    logger.info('Gemini AI initialized');
   }
 
   initializeDatabase() {
@@ -155,9 +152,9 @@ export class CombinedAutomationSystem extends EventEmitter {
     if (this.config.enableDatabase !== false) {
       this.db = new Database('./data/automation.db');
       this.createTables();
-      console.log('✅ Database initialized');
+      logger.info('Database initialized');
     } else {
-      console.log('⚠️ Database disabled for testing');
+      logger.warn('Database disabled for testing');
     }
   }
 
@@ -266,9 +263,9 @@ export class CombinedAutomationSystem extends EventEmitter {
         transport: viem_http(rpcUrl)
       });
 
-      console.log('✅ Blockchain clients initialized for Celo network');
+      logger.info('Blockchain clients initialized for Celo network');
     } catch (error) {
-      console.error('❌ Failed to initialize blockchain clients:', error);
+      logger.error('Failed to initialize blockchain clients', { error: error.message });
     }
   }
 
@@ -277,9 +274,9 @@ export class CombinedAutomationSystem extends EventEmitter {
       this.transactionTracker = new TransactionTracker((message) => {
         this.broadcastToClients(message);
       });
-      console.log('✅ Transaction tracker initialized');
+      logger.info('Transaction tracker initialized');
     } catch (error) {
-      console.error('❌ Failed to initialize transaction tracker:', error);
+      logger.error('Failed to initialize transaction tracker', { error: error.message });
     }
   }
 
@@ -291,9 +288,9 @@ export class CombinedAutomationSystem extends EventEmitter {
         network: this.config.network,
         rpcUrl: this.config.rpcUrl
       });
-      console.log('✅ Gas estimation service initialized');
+      logger.info('Gas estimation service initialized');
     } catch (error) {
-      console.error('❌ Failed to initialize gas estimation service:', error);
+      logger.error('Failed to initialize gas estimation service', { error: error.message });
     }
   }
 
@@ -303,21 +300,20 @@ export class CombinedAutomationSystem extends EventEmitter {
         apiKey: this.config.etherscanApiKey,
         network: this.config.network
       });
-      console.log('✅ Etherscan service initialized');
+      logger.info('Etherscan service initialized');
     } catch (error) {
-      console.error('❌ Failed to initialize Etherscan service:', error);
+      logger.error('Failed to initialize Etherscan service', { error: error.message });
     }
   }
 
   async initializeLangChain() {
     try {
-
       this.consolidatedAgentSystem = new ConsolidatedAgentSystem(this, this.config.geminiApiKey);
       await this.consolidatedAgentSystem.attachLangChainAgent();
       this.langChainAgent = this.consolidatedAgentSystem.langChainAgent;
-      console.log('✅ LangChain agent initialized via ConsolidatedAgentSystem');
+      logger.info('LangChain agent initialized via ConsolidatedAgentSystem');
     } catch (error) {
-      console.error('❌ Failed to initialize LangChain agent:', error);
+      logger.error('Failed to initialize LangChain agent', { error: error.message });
       this.langChainAgent = null;
     }
   }
@@ -330,24 +326,14 @@ export class CombinedAutomationSystem extends EventEmitter {
         rpcUrl: this.config.rpcUrl,
         enableRealTransactions: this.config.enableRealBlockchainCalls
       });
-      console.log('✅ Blockchain interface initialized');
+      logger.info('Blockchain interface initialized');
 
       if (this.langChainAgent && this.blockchainInterface) {
         this.langChainAgent.updateToolsWithInterface(this.blockchainInterface);
       }
     } catch (error) {
-      console.error('❌ Failed to initialize blockchain interface:', error);
+      logger.error('Failed to initialize blockchain interface', { error: error.message });
       this.blockchainInterface = null;
-    }
-  }
-
-  initializeSupabase() {
-    try {
-      this.supabase = SupabaseService;
-      console.log('✅ Supabase service initialized');
-    } catch (error) {
-      console.error('❌ Failed to initialize Supabase service:', error);
-      this.supabase = null;
     }
   }
 
@@ -355,17 +341,17 @@ export class CombinedAutomationSystem extends EventEmitter {
     try {
       if (this.config.enableAIAgents && AIAgentSystem) {
         this.aiAgentSystem = new AIAgentSystem(this, this.config.geminiApiKey);
-        console.log('✅ AI Agent System initialized');
+        logger.info('AI Agent System initialized');
       }
 
       if (this.config.enableMCP && CeloMCPServer) {
         this.mcpServer = new CeloMCPServer(this);
-        console.log('✅ MCP Server initialized');
+        logger.info('MCP Server initialized');
       }
 
       if (this.mcpServer && AgentOrchestrator) {
         this.agentOrchestrator = new AgentOrchestrator(this.mcpServer, this);
-        console.log('✅ Agent Orchestrator initialized');
+        logger.info('Agent Orchestrator initialized');
       }
 
       if (
@@ -378,18 +364,17 @@ export class CombinedAutomationSystem extends EventEmitter {
           .start()
           .then(() => {
             this._consolidatedAgentStarted = true;
-            console.log('✅ ConsolidatedAgentSystem MCP server started');
+            logger.info('ConsolidatedAgentSystem MCP server started');
           })
-          .catch((e) => console.warn('⚠️  Failed to start ConsolidatedAgentSystem MCP server:', e?.message || e));
+          .catch((e) => logger.warn('Failed to start ConsolidatedAgentSystem MCP server', { error: e?.message || e }));
       }
     } catch (error) {
-      console.error('⚠️  Advanced agent systems initialization warning:', error.message);
+      logger.warn('Advanced agent systems initialization warning', { error: error.message });
     }
   }
 
   initializeAdvancedFeatures() {
     try {
-
       this.predictiveAnalytics = {
         successRate: 0.95,
         averageExecutionTime: 0,
@@ -401,9 +386,9 @@ export class CombinedAutomationSystem extends EventEmitter {
 
       this.startPerformanceMonitoring();
 
-      console.log('✅ Advanced features initialized');
+      logger.info('Advanced features initialized');
     } catch (error) {
-      console.error('⚠️  Advanced features initialization warning:', error.message);
+      logger.warn('Advanced features initialization warning', { error: error.message });
     }
   }
 
@@ -720,7 +705,7 @@ export class CombinedAutomationSystem extends EventEmitter {
 
       const cachedResult = this.requestCache.get(cacheKey);
       if (cachedResult && !context.bypassCache) {
-        console.log('📦 Using cached result');
+        logger.debug('Using cached result');
         return { ...cachedResult, cached: true };
       }
 
@@ -800,7 +785,7 @@ export class CombinedAutomationSystem extends EventEmitter {
 
       return finalResult;
     } catch (error) {
-      console.error('Error in processNaturalLanguage:', error);
+      logger.error('Error in processNaturalLanguage', { error: error.message });
       return {
         success: false,
         error: error.message,
@@ -1152,7 +1137,7 @@ Guidelines:
         data.agentId || null
       );
     } catch (error) {
-      console.error('Error storing transaction history:', error);
+      logger.error('Error storing transaction history', { error: error.message });
     }
   }
 
@@ -1194,7 +1179,7 @@ Guidelines:
 
       return stmt.run(...values);
     } catch (error) {
-      console.error('Error updating transaction history:', error);
+      logger.error('Error updating transaction history', { error: error.message });
     }
   }
 
@@ -1207,7 +1192,7 @@ Guidelines:
       `);
       return stmt.all(limit);
     } catch (error) {
-      console.error('Error retrieving transaction history:', error);
+      logger.error('Error retrieving transaction history', { error: error.message });
       return [];
     }
   }
@@ -1225,23 +1210,23 @@ Guidelines:
   }
 
   async initializeEnhancedFeatures() {
-    console.log('🚀 Initializing Enhanced Features...');
+    logger.info('Initializing Enhanced Features...');
     
     if (this.config.enableMultiChain) {
       try {
         this.multiChainConfig = new MultiChainConfig();
-        console.log('✅ Multi-Chain Configuration initialized');
+        logger.info('Multi-Chain Configuration initialized');
       } catch (error) {
-        console.error('❌ Failed to initialize Multi-Chain Configuration:', error);
+        logger.error('Failed to initialize Multi-Chain Configuration', { error: error.message });
       }
     }
 
     if (this.config.enableContractFactory && this.multiChainConfig) {
       try {
         this.contractFactory = new ContractFactory(this.multiChainConfig);
-        console.log('✅ Contract Factory initialized');
+        logger.info('Contract Factory initialized');
       } catch (error) {
-        console.error('❌ Failed to initialize Contract Factory:', error);
+        logger.error('Failed to initialize Contract Factory', { error: error.message });
       }
     }
 
@@ -1253,9 +1238,9 @@ Guidelines:
           enableLogging: true,
           metricsInterval: this.config.monitoringInterval
         });
-        console.log('✅ Monitoring System initialized');
+        logger.info('Monitoring System initialized');
       } catch (error) {
-        console.error('❌ Failed to initialize Monitoring System:', error);
+        logger.error('Failed to initialize Monitoring System', { error: error.message });
       }
     }
 
@@ -1264,9 +1249,9 @@ Guidelines:
         this.postmanProtocol = new PostmanProtocol({
           apiKey: this.config.postmanApiKey
         });
-        console.log('✅ Postman Protocol initialized');
+        logger.info('Postman Protocol initialized');
       } catch (error) {
-        console.error('❌ Failed to initialize Postman Protocol:', error);
+        logger.error('Failed to initialize Postman Protocol', { error: error.message });
       }
     }
 
@@ -1276,9 +1261,9 @@ Guidelines:
         enableToolRegistry: true,
         autoLoadTools: true
       });
-      console.log('✅ Environment Manager initialized');
+      logger.info('Environment Manager initialized');
     } catch (error) {
-      console.error('❌ Failed to initialize Environment Manager:', error);
+      logger.error('Failed to initialize Environment Manager', { error: error.message });
     }
 
     try {
@@ -1291,9 +1276,9 @@ Guidelines:
       if (this.contractFactory) {
         this.codeGenerator.setContractFactory(this.contractFactory);
       }
-      console.log('✅ Code Generator initialized');
+      logger.info('Code Generator initialized');
     } catch (error) {
-      console.error('❌ Failed to initialize Code Generator:', error);
+      logger.error('Failed to initialize Code Generator', { error: error.message });
     }
 
     try {
@@ -1301,9 +1286,9 @@ Guidelines:
         enableAutoRebalancing: true,
         automationSystem: this
       });
-      console.log('✅ Rebalancer System initialized');
+      logger.info('Rebalancer System initialized');
     } catch (error) {
-      console.error('❌ Failed to initialize Rebalancer System:', error);
+      logger.error('Failed to initialize Rebalancer System', { error: error.message });
     }
 
     if (this.environmentManager && this.contractFactory) {
@@ -1322,12 +1307,9 @@ Guidelines:
           tools: []
         });
         
-        console.log('✅ AutoFi SDK initialized and connected to Environment Manager');
+        logger.info('AutoFi SDK initialized and connected to Environment Manager');
       } catch (error) {
-        console.error('❌ Failed to initialize AutoFi SDK:', error);
-        if (error instanceof Error) {
-          console.error('Error details:', error.message, error.stack);
-        }
+        logger.error('Failed to initialize AutoFi SDK', { error: error.message, stack: error.stack });
       }
     }
 
@@ -1341,9 +1323,9 @@ Guidelines:
           enableCORS: true,
           enableAuth: false
         });
-        console.log('✅ Proxy Server initialized');
+        logger.info('Proxy Server initialized');
       } catch (error) {
-        console.error('❌ Failed to initialize Proxy Server:', error);
+        logger.error('Failed to initialize Proxy Server', { error: error.message });
       }
     }
 
@@ -1359,9 +1341,9 @@ Guidelines:
           this.app.use('/health', healthRoutes);
         } catch {
         }
-        console.log('✅ Enhanced API routes added');
+        logger.info('Enhanced API routes added');
       } catch (error) {
-        console.error('❌ Failed to add enhanced API routes:', error);
+        logger.error('Failed to add enhanced API routes', { error: error.message });
       }
     }
   }
@@ -1369,15 +1351,15 @@ Guidelines:
   setupMiddleware() {
     this.app.use(helmet());
     this.app.use(cors({
-      origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost'],
+      origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:3001'],
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-ID', 'X-Request-ID', 'X-Correlation-ID', 'X-API-Key']
     }));
     
     const limiter = rateLimit({
-      windowMs: 15 * 60 * 1000,
-      max: 200,
+      windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'),
+      max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '200'),
       message: {
         success: false,
         error: {
@@ -1391,11 +1373,21 @@ Guidelines:
     });
     this.app.use(limiter);
     
-    import('../utils/logger.js').then(({ logger, requestLogger }) => {
-      this.app.use(requestLogger(logger));
+    Promise.all([
+      import('../utils/request-id.js').catch(() => null),
+      import('../middleware/request-logger.js').catch(() => null),
+      import('../middleware/error-handler.js').catch(() => null),
+    ]).then(([requestIdModule, requestLoggerModule, errorHandlerModule]) => {
+      if (requestIdModule?.requestIdMiddleware) {
+        this.app.use(requestIdModule.requestIdMiddleware);
+      }
+      
+      if (requestLoggerModule?.requestLoggerMiddleware && process.env.ENABLE_REQUEST_LOGGING !== 'false') {
+        this.app.use(requestLoggerModule.requestLoggerMiddleware);
+      }
     }).catch(() => {
       this.app.use((req, res, next) => {
-        console.log(`${new Date().toISOString()} - ${req.method} ${req.url} - ${req.ip}`);
+        logger.debug(`${req.method} ${req.url}`, { ip: req.ip });
         next();
       });
     });
@@ -1976,13 +1968,13 @@ Guidelines:
     const wss = new WebSocketServer({ server });
 
     wss.on('connection', (ws) => {
-      console.log('📡 WebSocket client connected');
+      logger.info('WebSocket client connected');
       this.wsClients.add(ws);
 
       ws.on('message', (message) => {
         try {
           const data = JSON.parse(message);
-          console.log('📨 WebSocket message received:', data);
+          logger.debug('WebSocket message received', { type: data.type });
 
           if (data.type === 'ping') {
             ws.send(JSON.stringify({
@@ -1999,17 +1991,17 @@ Guidelines:
             timestamp: new Date().toISOString()
           }));
         } catch (error) {
-          console.error('WebSocket message error:', error);
+          logger.error('WebSocket message error', { error: error.message });
         }
       });
 
       ws.on('close', () => {
-        console.log('📡 WebSocket client disconnected');
+        logger.info('WebSocket client disconnected');
         this.wsClients.delete(ws);
       });
 
       ws.on('error', (error) => {
-        console.error('WebSocket error:', error);
+        logger.error('WebSocket error', { error: error.message });
         this.wsClients.delete(ws);
       });
 
@@ -2042,57 +2034,25 @@ Guidelines:
         .then(() => {
           this._consolidatedAgentStarted = true;
         })
-        .catch((e) => console.warn('⚠️  Consolidated MCP start (on server start) failed:', e?.message || e));
+        .catch((e) => logger.warn('Consolidated MCP start (on server start) failed', { error: e?.message || e }));
     }
 
     server.listen(this.config.port, () => {
-      console.log('\n╔════════════════════════════════════════════════════════════════╗');
-      console.log('║    🚀 Advanced AI Automation System v5.0.0 - RUNNING           ║');
-      console.log('╚════════════════════════════════════════════════════════════════╝\n');
-      console.log('📍 Port:', this.config.port);
-      console.log('🌐 Network:', this.config.network);
-      console.log('🤖 AI Engine: Connected');
-      console.log('🔗 Blockchain API: Connected');
-      console.log('💾 Database: Connected');
-      console.log('🔌 WebSocket: Ready');
-      console.log('📊 Performance Monitor: Active');
-      console.log('🛡️  Security Auditor: Active');
-      console.log('� Predictive Analytics: Active');
-      console.log('�🎭 MCP Server:', this.mcpServer ? 'Enabled' : 'Disabled');
-      console.log('🤖 AI Agents:', this.aiAgentSystem ? 'Enabled' : 'Disabled');
-  console.log('� Orchestrator:', this.agentOrchestrator ? 'Enabled' : 'Disabled');
-  console.log('🤝 Consolidated Agent MCP:', this.consolidatedAgentSystem ? 'Enabled' : 'Disabled');
-      console.log('🌐 Multi-Chain Support:', this.multiChainConfig ? 'Enabled' : 'Disabled');
-      console.log('📝 Contract Factory:', this.contractFactory ? 'Enabled' : 'Disabled');
-      console.log('📊 Monitoring System:', this.monitoringSystem ? 'Enabled' : 'Disabled');
-      console.log('🧪 Testing Suite:', this.postmanProtocol ? 'Enabled' : 'Disabled');
-      console.log('⚖️  Proxy Server:', this.proxyServer ? 'Enabled' : 'Disabled');
-
-      console.log('\n📋 Advanced API Endpoints:');
-      console.log('  POST   /api/automate - Main automation endpoint');
-      console.log('  POST   /api/agents/create - Create AI agent');
-      console.log('  GET    /api/advanced/metrics - Real-time metrics');
-      console.log('  GET    /api/advanced/predictions - Predictive analytics');
-      console.log('  GET    /api/advanced/security-audit - Security reports');
-      console.log('  GET    /api/advanced/optimizations - Optimization suggestions');
-      console.log('  GET    /api/analytics - Comprehensive analytics');
-      console.log('  GET    /health - Health check');
-      console.log('  WS     /ws - WebSocket real-time updates');
-      console.log('\n🌐 Enhanced Multi-Chain Endpoints:');
-      console.log('  GET    /api/chains - Get supported chains');
-      console.log('  GET    /api/chains/health - Chain health status');
-      console.log('  POST   /api/chains/select - Select best chain');
-      console.log('  POST   /api/contracts/deploy - Deploy contracts');
-      console.log('  GET    /api/contracts - List deployed contracts');
-      console.log('  POST   /api/transactions/send - Send transactions');
-      console.log('  GET    /api/tokens/balance/:address - Get token balance');
-      console.log('\n📊 Monitoring & Testing Endpoints:');
-      console.log('  GET    /api/monitoring/system - System metrics');
-      console.log('  GET    /api/monitoring/alerts - System alerts');
-      console.log('  GET    /api/monitoring/logs - System logs');
-      console.log('  GET    /api/testing/collections - Test collections');
-      console.log('  POST   /api/testing/collections/:id/run - Run tests');
-      console.log('  GET    /api/loadbalancer/status - Load balancer status\n');
+      logger.info('Server started', {
+        port: this.config.port,
+        network: this.config.network,
+        features: {
+          mcp: !!this.mcpServer,
+          aiAgents: !!this.aiAgentSystem,
+          orchestrator: !!this.agentOrchestrator,
+          consolidatedAgents: !!this.consolidatedAgentSystem,
+          multiChain: !!this.multiChainConfig,
+          contractFactory: !!this.contractFactory,
+          monitoring: !!this.monitoringSystem,
+          testing: !!this.postmanProtocol,
+          proxy: !!this.proxyServer
+        }
+      });
     });
 
     this.server = server;
@@ -2100,7 +2060,7 @@ Guidelines:
 
   setupEventMonitoring() {
     this.on('execution', (result) => {
-      console.log(`✅ Execution completed - Success Rate: ${(result.confidence * 100).toFixed(1)}%`);
+      logger.info(`Execution completed`, { successRate: `${(result.confidence * 100).toFixed(1)}%` });
 
       if (result.securityAnalysis) {
         this.securityAudits.push({
@@ -2111,7 +2071,7 @@ Guidelines:
     });
 
     this.on('error', (error) => {
-      console.error('❌ System error:', error);
+      logger.error('System error', { error: error.message });
       this.advisorySystem.get('securityAlerts')?.alerts.push({
         timestamp: Date.now(),
         severity: 'error',
@@ -2130,24 +2090,22 @@ Guidelines:
   }
 
   async shutdown() {
-    console.log('\n🛑 Initiating Advanced System Shutdown...');
-    console.log('═'.repeat(60));
+    logger.info('Initiating Advanced System Shutdown...');
 
     try {
       if (this.transactionTracker) {
         this.transactionTracker.shutdown();
-        console.log('✅ Transaction tracker shut down');
+        logger.info('Transaction tracker shut down');
       }
     } catch (error) {
-      console.error('❌ Error shutting down transaction tracker:', error);
+      logger.error('Error shutting down transaction tracker', { error: error.message });
     }
 
     try {
-
       this.saveFinalMetrics();
-      console.log('✅ Metrics saved');
+      logger.info('Metrics saved');
     } catch (error) {
-      console.error('❌ Error saving metrics:', error);
+      logger.error('Error saving metrics', { error: error.message });
     }
 
     try {
@@ -2155,57 +2113,56 @@ Guidelines:
         client.close();
       }
       this.wsClients.clear();
-      console.log('✅ WebSocket connections closed');
+      logger.info('WebSocket connections closed');
     } catch (error) {
-      console.error('❌ Error closing WebSocket connections:', error);
+      logger.error('Error closing WebSocket connections', { error: error.message });
     }
 
     try {
       if (this.server) {
         this.server.close();
-        console.log('✅ HTTP server closed');
+        logger.info('HTTP server closed');
       }
     } catch (error) {
-      console.error('❌ Error closing HTTP server:', error);
+      logger.error('Error closing HTTP server', { error: error.message });
     }
 
     try {
       if (this.agentOrchestrator) {
         this.agentOrchestrator.stop();
-        console.log('✅ Agent orchestrator stopped');
+        logger.info('Agent orchestrator stopped');
       }
     } catch (error) {
-      console.error('❌ Error stopping agent orchestrator:', error);
+      logger.error('Error stopping agent orchestrator', { error: error.message });
     }
 
     try {
       if (this.mcpServer && typeof this.mcpServer.stop === 'function') {
         await this.mcpServer.stop();
-        console.log('✅ MCP Server stopped');
+        logger.info('MCP Server stopped');
       }
     } catch (error) {
-      console.error('❌ Error stopping MCP Server:', error);
+      logger.error('Error stopping MCP Server', { error: error.message });
     }
 
     try {
       if (this.consolidatedAgentSystem && typeof this.consolidatedAgentSystem.stop === 'function') {
         await this.consolidatedAgentSystem.stop();
         this._consolidatedAgentStarted = false;
-        console.log('✅ ConsolidatedAgentSystem MCP server stopped');
+        logger.info('ConsolidatedAgentSystem MCP server stopped');
       }
     } catch (error) {
-      console.error('❌ Error stopping ConsolidatedAgentSystem MCP server:', error);
+      logger.error('Error stopping ConsolidatedAgentSystem MCP server', { error: error.message });
     }
 
     try {
       this.db.close();
-      console.log('✅ Database connection closed');
+      logger.info('Database connection closed');
     } catch (error) {
-      console.error('❌ Error closing database:', error);
+      logger.error('Error closing database', { error: error.message });
     }
 
-    console.log('═'.repeat(60));
-    console.log('👋 Advanced AI Automation System v5.0.0 stopped gracefully\n');
+    logger.info('Advanced AI Automation System v5.0.0 stopped gracefully');
   }
 
   saveFinalMetrics() {
@@ -2218,7 +2175,7 @@ Guidelines:
       failedTransactions: this.failedTransactions.length
     };
 
-    console.log('📊 Final Metrics:', finalMetrics);
+    logger.debug('Final Metrics', finalMetrics);
   }
 
   getStatus() {
@@ -2260,38 +2217,36 @@ if (isMainModule) {
       enableAdvancedFeatures: process.env.ENABLE_ADVANCED_FEATURES !== 'false'
     };
 
-    console.log('\n╔════════════════════════════════════════════════════════════════╗');
-    console.log('║  Starting Advanced AI Automation System v5.0.0 - Enterprise    ║');
-    console.log('╚════════════════════════════════════════════════════════════════╝\n');
+    logger.info('Starting Advanced AI Automation System v5.0.0 - Enterprise');
 
     const automation = new CombinedAutomationSystem(config);
     automation.start();
 
     process.on('SIGINT', async () => {
-      console.log('\n⚠️  SIGINT received - initiating graceful shutdown...');
+      logger.info('SIGINT received - initiating graceful shutdown...');
       await automation.shutdown();
       process.exit(0);
     });
 
     process.on('SIGTERM', async () => {
-      console.log('\n⚠️  SIGTERM received - initiating graceful shutdown...');
+      logger.info('SIGTERM received - initiating graceful shutdown...');
       await automation.shutdown();
       process.exit(0);
     });
 
     process.on('uncaughtException', async (error) => {
-      console.error('\n❌ Uncaught Exception:', error);
+      logger.error('Uncaught Exception', { error: error.message, stack: error.stack });
       await automation.shutdown();
       process.exit(1);
     });
 
     process.on('unhandledRejection', async (reason, promise) => {
-      console.error('\n❌ Unhandled Rejection at:', promise, 'reason:', reason);
+      logger.error('Unhandled Rejection', { promise, reason: reason?.message || reason });
       await automation.shutdown();
       process.exit(1);
     });
   } catch (error) {
-    console.error('\n❌ Failed to start advanced automation system:', error);
+    logger.error('Failed to start advanced automation system', { error: error.message });
     process.exit(1);
   }
 }

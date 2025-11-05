@@ -1,6 +1,7 @@
 import { createPublicClient, createWalletClient, http, parseEther, formatEther, hexToBigInt } from 'viem';
 import { celo, celoAlfajores } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
+import logger from '../utils/logger.js';
 
 export const CELO_TOKENS = {
   CELO: '0x0000000000000000000000000000000000000000',
@@ -89,17 +90,17 @@ export class BlockchainInterface {
             transport: http(this.rpcUrl)
           });
           this.account = account;
-          console.log(`✅ Wallet initialized for address: ${account.address}`);
+          logger.info('Wallet initialized', { address: account.address });
         } catch (error) {
-          console.warn('⚠️ Invalid private key provided, wallet operations disabled:', error.message);
+          logger.warn('Invalid private key provided, wallet operations disabled', { error: error.message });
         }
       } else {
-        console.warn('⚠️ No private key provided, wallet operations disabled');
+        logger.warn('No private key provided, wallet operations disabled');
       }
 
-      console.log(`✅ Blockchain clients initialized for ${this.config.network}`);
+      logger.info('Blockchain clients initialized', { network: this.config.network });
     } catch (error) {
-      console.error('❌ Failed to initialize blockchain clients:', error);
+      logger.error('Failed to initialize blockchain clients', { error: error.message, stack: error.stack });
       throw error;
     }
   }
@@ -146,7 +147,7 @@ export class BlockchainInterface {
         symbol
       };
     } catch (error) {
-      console.error('Get token balance error:', error);
+      logger.error('Get token balance error', { error: error.message, address, tokenAddress });
       return {
         success: false,
         error: error.message,
@@ -174,7 +175,7 @@ export class BlockchainInterface {
         address: account.address
       };
     } catch (error) {
-      console.error('Error creating dynamic wallet:', error);
+      logger.error('Error creating dynamic wallet', { error: error.message, stack: error.stack });
       throw new Error(`Failed to create wallet: ${error.message}`);
     }
   }
@@ -234,7 +235,7 @@ export class BlockchainInterface {
         };
       }
     } catch (error) {
-      console.error('Send token with private key error:', error);
+      logger.error('Send token with private key error', { error: error.message, tokenAddress, to, amount, from });
       return {
         success: false,
         error: error.message,
@@ -252,7 +253,7 @@ export class BlockchainInterface {
         throw new Error('Private key does not match the sender address');
       }
 
-      console.log(`🔄 Swapping ${amountIn} ${tokenIn} for ${amountOut} ${tokenOut}`);
+      logger.info('Swapping tokens', { tokenIn, tokenOut, amountIn, amountOut, from, slippage });
 
       if (!this.config.enableRealTransactions) {
 
@@ -278,7 +279,7 @@ export class BlockchainInterface {
         note: 'DEX integration pending'
       };
     } catch (error) {
-      console.error('Swap tokens with private key error:', error);
+      logger.error('Swap tokens with private key error', { error: error.message, tokenIn, tokenOut, amountIn, amountOut, from, slippage });
       return {
         success: false,
         error: error.message,
@@ -319,7 +320,7 @@ export class BlockchainInterface {
         message: `Sent ${amount} CELO to ${to}`
       };
     } catch (error) {
-      console.error('Send CELO with private key error:', error);
+      logger.error('Send CELO with private key error', { error: error.message, to, amount, from });
       return {
         success: false,
         error: error.message,
@@ -330,7 +331,7 @@ export class BlockchainInterface {
 
   async swapTokens(tokenIn, tokenOut, amountIn, amountOut, from, slippage = 0.5) {
     try {
-      console.log(`🔄 Swapping ${amountIn} ${tokenIn} for ${amountOut} ${tokenOut}`);
+      logger.info('Swapping tokens', { tokenIn, tokenOut, amountIn, amountOut, from, slippage });
 
       if (!this.config.enableRealTransactions) {
 
@@ -356,7 +357,7 @@ export class BlockchainInterface {
         note: 'DEX integration pending'
       };
     } catch (error) {
-      console.error('Swap tokens error:', error);
+      logger.error('Swap tokens error', { error: error.message, tokenIn, tokenOut, amountIn, amountOut, from, slippage });
       return {
         success: false,
         error: error.message,
@@ -386,7 +387,7 @@ export class BlockchainInterface {
         estimatedCostWei: totalCost.toString()
       };
     } catch (error) {
-      console.error('Estimate gas error:', error);
+      logger.error('Estimate gas error', { error: error.message, to, value, data });
       return {
         success: false,
         error: error.message,
@@ -419,7 +420,7 @@ export class BlockchainInterface {
         confirmations: '0'
       };
     } catch (error) {
-      console.error('Get transaction status error:', error);
+      logger.error('Get transaction status error', { error: error.message, txHash });
       return {
         success: false,
         error: error.message,
@@ -443,7 +444,7 @@ export class BlockchainInterface {
           : 'Transaction failed'
       };
     } catch (error) {
-      console.error('Wait for transaction error:', error);
+      logger.error('Wait for transaction error', { error: error.message, txHash, confirmations });
       return {
         success: false,
         error: error.message

@@ -1,21 +1,28 @@
+import { z } from 'zod';
+import { ValidationError } from '../utils/errors.js';
 
-
-
-export function validateBody(schema) {
-  return async (req, res, next) => {
+/**
+ * Validation middleware factory
+ */
+export function validate(schema) {
+  return (req, res, next) => {
     try {
-      req.body = await schema.parseAsync(req.body);
+      const validated = schema.parse({
+        body: req.body,
+        query: req.query,
+        params: req.params,
+      });
+      
+      // Attach validated data to request
+      req.validated = validated;
       next();
     } catch (error) {
-      if (error.name === 'ZodError') {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Request body validation failed',
-            details: error.errors,
-            timestamp: new Date().toISOString(),
-          },
+      if (error instanceof z.ZodError) {
+        throw new ValidationError('Validation failed', {
+          errors: error.errors.map(e => ({
+            path: e.path.join('.'),
+            message: e.message,
+          })),
         });
       }
       next(error);
@@ -23,48 +30,12 @@ export function validateBody(schema) {
   };
 }
 
-
-export function validateQuery(schema) {
-  return async (req, res, next) => {
-    try {
-      req.query = await schema.parseAsync(req.query);
-      next();
-    } catch (error) {
-      if (error.name === 'ZodError') {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Query parameters validation failed',
-            details: error.errors,
-            timestamp: new Date().toISOString(),
-          },
-        });
-      }
-      next(error);
-    }
-  };
-}
-
-
-export function validateParams(schema) {
-  return async (req, res, next) => {
-    try {
-      req.params = await schema.parseAsync(req.params);
-      next();
-    } catch (error) {
-      if (error.name === 'ZodError') {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Route parameters validation failed',
-            details: error.errors,
-            timestamp: new Date().toISOString(),
-          },
-        });
-      }
-      next(error);
-    }
-  };
-}
+/**
+ * Common validation schemas
+ */
+export const schemas = {
+  address: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address format'),
+  hexString: z.string().regex(/^0x[a-fA-F0-9]+$/, 'Invalid hex string format'),
+  chainId: z.string().min(1),
+  txHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/, 'Invalid transaction hash format'),
+};

@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import os from 'os';
 import process from 'process';
+import logger from './utils/logger.js';
 
 export class MonitoringSystem extends EventEmitter {
   constructor(config = {}) {
@@ -90,7 +91,7 @@ export class MonitoringSystem extends EventEmitter {
       }
       
     } catch (error) {
-      console.error('Error collecting metrics:', error);
+      logger.error('Error collecting metrics', { error: error.message, stack: error.stack });
       this.emit('metricsError', error);
     }
   }
@@ -222,7 +223,7 @@ export class MonitoringSystem extends EventEmitter {
           this.triggerAlert(condition);
         }
       } catch (error) {
-        console.error('Error checking alert condition:', error);
+        logger.error('Error checking alert condition', { error: error.message, alert: condition.name });
       }
     });
   }

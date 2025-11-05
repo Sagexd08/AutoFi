@@ -1,14 +1,16 @@
 
 
 
+import logger from './logger.js';
+
 export function setupGracefulShutdown({ onShutdown, timeout = 30000, server }) {
   const shutdown = async (signal) => {
-    console.log(`Received ${signal}, starting graceful shutdown...`);
+    logger.info(`Received ${signal}, starting graceful shutdown...`);
 
     
     if (server) {
       server.close(() => {
-        console.log('HTTP server closed');
+        logger.info('HTTP server closed');
       });
     }
 
@@ -21,10 +23,10 @@ export function setupGracefulShutdown({ onShutdown, timeout = 30000, server }) {
             setTimeout(() => reject(new Error('Shutdown timeout')), timeout)
           ),
         ]);
-        console.log('Shutdown completed successfully');
+        logger.info('Shutdown completed successfully');
         process.exit(0);
       } catch (error) {
-        console.error('Error during shutdown:', error);
+        logger.error('Error during shutdown', { error: error.message, stack: error.stack });
         process.exit(1);
       }
     } else {
@@ -38,13 +40,13 @@ export function setupGracefulShutdown({ onShutdown, timeout = 30000, server }) {
 
   
   process.on('uncaughtException', (error) => {
-    console.error('Uncaught exception:', error);
+    logger.error('Uncaught exception', { error: error.message, stack: error.stack });
     shutdown('uncaughtException');
   });
 
   
   process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled rejection at:', promise, 'reason:', reason);
+    logger.error('Unhandled rejection', { promise: promise.toString(), reason: reason?.toString() || reason });
     shutdown('unhandledRejection');
   });
 }

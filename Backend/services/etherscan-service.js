@@ -1,6 +1,7 @@
 
 
 import fetch from 'node-fetch';
+import logger from '../utils/logger.js';
 
 export class EtherscanService {
   constructor(config = {}) {
@@ -29,7 +30,7 @@ export class EtherscanService {
       }
       throw new Error(result.message || 'Failed to get balance');
     } catch (error) {
-      console.error('Etherscan balance error:', error);
+      logger.error('Etherscan balance error', { error: error.message, address, stack: error.stack });
       return null;
     }
   }
@@ -45,7 +46,7 @@ export class EtherscanService {
       }
       return [];
     } catch (error) {
-      console.error('Etherscan transactions error:', error);
+      logger.error('Etherscan transactions error', { error: error.message, address, stack: error.stack });
       return [];
     }
   }
@@ -61,7 +62,7 @@ export class EtherscanService {
       }
       return [];
     } catch (error) {
-      console.error('Etherscan internal transactions error:', error);
+      logger.error('Etherscan internal transactions error', { error: error.message, address, stack: error.stack });
       return [];
     }
   }
@@ -81,7 +82,7 @@ export class EtherscanService {
       }
       return [];
     } catch (error) {
-      console.error('Etherscan token transfers error:', error);
+      logger.error('Etherscan token transfers error', { error: error.message, address, stack: error.stack });
       return [];
     }
   }
@@ -100,7 +101,7 @@ export class EtherscanService {
       }
       return null;
     } catch (error) {
-      console.error('Etherscan transaction status error:', error);
+      logger.error('Etherscan transaction status error', { error: error.message, txHash, stack: error.stack });
       return null;
     }
   }
@@ -116,7 +117,7 @@ export class EtherscanService {
       }
       throw new Error(result.message || 'Failed to get ABI');
     } catch (error) {
-      console.error('Etherscan ABI error:', error);
+      logger.error('Etherscan ABI error', { error: error.message, contractAddress, stack: error.stack });
       return null;
     }
   }
@@ -132,7 +133,7 @@ export class EtherscanService {
       }
       return null;
     } catch (error) {
-      console.error('Etherscan source code error:', error);
+      logger.error('Etherscan source code error', { error: error.message, contractAddress, stack: error.stack });
       return null;
     }
   }
@@ -148,7 +149,7 @@ export class EtherscanService {
       }
       return null;
     } catch (error) {
-      console.error('Etherscan gas tracker error:', error);
+      logger.error('Etherscan gas tracker error', { error: error.message, stack: error.stack });
       return null;
     }
   }
@@ -164,7 +165,7 @@ export class EtherscanService {
       }
       return null;
     } catch (error) {
-      console.error('Etherscan block info error:', error);
+      logger.error('Etherscan block info error', { error: error.message, blockNumber, stack: error.stack });
       return null;
     }
   }
@@ -189,7 +190,7 @@ export class EtherscanService {
         recentTokenTransfers: tokenTransfers.slice(0, 10)
       };
     } catch (error) {
-      console.error('Etherscan analytics error:', error);
+      logger.error('Etherscan analytics error', { error: error.message, stack: error.stack });
       return null;
     }
   }

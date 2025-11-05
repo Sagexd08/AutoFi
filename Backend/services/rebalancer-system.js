@@ -1,4 +1,6 @@
 import { EventEmitter } from 'events';
+import logger from '../utils/logger.js';
+
 export class RebalancerSystem extends EventEmitter {
   constructor(config = {}) {
     super();
@@ -46,7 +48,7 @@ export class RebalancerSystem extends EventEmitter {
             totalValue = balances.result.totalValue || 0;
           }
         } catch (error) {
-          console.warn('Failed to get real balances, using mock data:', error.message);
+          logger.warn('Failed to get real balances, using mock data', { error: error.message });
         }
       }
       if (Object.keys(currentBalances).length === 0) {
@@ -363,4 +365,4 @@ export class RebalancerSystem extends EventEmitter {
     };
   }
 }
-export default RebalancerSystem;
+export default RebalancerSystem;
