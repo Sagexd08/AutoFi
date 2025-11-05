@@ -1,5 +1,4 @@
 import chalk from 'chalk';
-import { getConfig } from './init.js';
 
 export async function deployCommand(options: any) {
   console.log(chalk.yellow('📦 Contract deployment feature coming soon'));

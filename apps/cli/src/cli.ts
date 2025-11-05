@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import chalk from 'chalk';
 import ora from 'ora';
-import inquirer from 'inquirer';
 import { initCommand } from './commands/init.js';
 import { deployCommand } from './commands/deploy.js';
 import { workflowCommand } from './commands/workflow.js';

@@ -4,10 +4,8 @@ import {
   SystemMessagePromptTemplate,
   HumanMessagePromptTemplate,
 } from '@langchain/core/prompts';
-import { HumanMessage, AIMessage } from '@langchain/core/messages';
 import { LangChainAgent } from './agent.js';
 import type { Workflow } from '@celo-automator/types';
-import type { AgentResponse } from '@celo-automator/types';
 
 const WORKFLOW_SYSTEM_PROMPT = `You are an advanced AI workflow orchestrator for Celo blockchain automation.
 
@@ -206,11 +204,12 @@ export class WorkflowOrchestrator {
         if (action.tokenAddress) {
           const tool = tools.find((t) => t.name === 'send_token');
           if (tool) {
-            const result = await tool.func({
+            const resultStr = await tool.func({
               tokenAddress: action.tokenAddress,
               to: action.to!,
               amount: action.amount!,
-            });
+            } as any);
+            const result = typeof resultStr === 'string' ? JSON.parse(resultStr) : resultStr;
             return {
               success: result.success,
               transactionHash: result.transactionHash,
@@ -221,10 +220,11 @@ export class WorkflowOrchestrator {
         } else {
           const tool = tools.find((t) => t.name === 'send_celo');
           if (tool) {
-            const result = await tool.func({
+            const resultStr = await tool.func({
               to: action.to!,
               amount: action.amount!,
-            });
+            } as any);
+            const result = typeof resultStr === 'string' ? JSON.parse(resultStr) : resultStr;
             return {
               success: result.success,
               transactionHash: result.transactionHash,
@@ -239,11 +239,13 @@ export class WorkflowOrchestrator {
       case 'contract_call': {
         const tool = tools.find((t) => t.name === 'call_contract');
         if (tool) {
-          const result = await tool.func({
+          const resultStr = await tool.func({
             address: action.contractAddress!,
             functionName: action.functionName!,
             parameters: action.parameters || [],
-          });
+            abi: action.abi,
+          } as any);
+          const result = typeof resultStr === 'string' ? JSON.parse(resultStr) : resultStr;
           return {
             success: result.success,
             transactionHash: result.transactionHash,

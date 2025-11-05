@@ -32,7 +32,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/health', healthRoutes);
 
 // Error handling
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Error:', err);
   res.status(err.statusCode || 500).json({
     success: false,

@@ -1,16 +1,16 @@
-import express from 'express';
+import express, { Router } from 'express';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Event subscription endpoints (placeholder for future implementation)
-router.post('/subscribe', async (req, res) => {
+router.post('/subscribe', async (_req, res) => {
   res.json({
     success: true,
     message: 'Event subscription endpoint - coming soon',
   });
 });
 
-router.get('/subscriptions', async (req, res) => {
+router.get('/subscriptions', async (_req, res) => {
   res.json({
     success: true,
     subscriptions: [],

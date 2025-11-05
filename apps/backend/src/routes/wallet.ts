@@ -1,10 +1,10 @@
-import express from 'express';
+import express, { Router } from 'express';
 import { CeloClient } from '@celo-automator/celo-functions';
 import { getBalance, getTokenBalance } from '@celo-automator/celo-functions';
 import { AddressSchema } from '@celo-automator/core';
 import type { Address } from 'viem';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 let celoClient: CeloClient | undefined;
 
@@ -50,21 +50,21 @@ router.get('/balance/:address', async (req, res, next) => {
         tokenAddress as Address
       );
 
-      res.json({
+      return res.json({
         success: true,
         balance,
       });
     } else {
       const balance = await getBalance(celoClient, address as Address);
 
-      res.json({
+      return res.json({
         success: true,
         balance: balance.toString(),
         balanceFormatted: (BigInt(balance) / BigInt(10 ** 18)).toString(),
       });
     }
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 

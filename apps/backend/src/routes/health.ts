@@ -1,9 +1,9 @@
-import express from 'express';
+import express, { Router } from 'express';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Health check
-router.get('/', async (req, res) => {
+router.get('/', async (_req, res) => {
   res.json({
     success: true,
     status: 'healthy',

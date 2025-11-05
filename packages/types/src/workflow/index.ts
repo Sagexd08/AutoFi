@@ -2,20 +2,20 @@ import { z } from 'zod';
 
 export const WorkflowTriggerSchema = z.object({
   type: z.enum(['event', 'cron', 'manual', 'condition']),
-  event?: z.object({
+  event: z.object({
     contractAddress: z.string(),
     eventName: z.string(),
     filter: z.record(z.any()).optional(),
-  }),
-  cron?: z.string(),
-  condition?: z.object({
+  }).optional(),
+  cron: z.string().optional(),
+  condition: z.object({
     type: z.enum(['balance', 'price', 'custom']),
     operator: z.enum(['gt', 'gte', 'lt', 'lte', 'eq']),
     value: z.union([z.string(), z.number()]),
-  }),
+  }).optional(),
 });
 
-export const WorkflowActionSchema = z.object({
+export const WorkflowActionSchema: z.ZodType<any> = z.object({
   type: z.enum([
     'transfer',
     'contract_call',
@@ -24,20 +24,20 @@ export const WorkflowActionSchema = z.object({
     'conditional',
     'batch',
   ]),
-  to?: z.string(),
-  amount?: z.string(),
-  tokenAddress?: z.string(),
-  contractAddress?: z.string(),
-  functionName?: z.string(),
-  parameters?: z.array(z.any()),
-  webhookUrl?: z.string(),
-  message?: z.string(),
-  condition?: z.object({
+  to: z.string().optional(),
+  amount: z.string().optional(),
+  tokenAddress: z.string().optional(),
+  contractAddress: z.string().optional(),
+  functionName: z.string().optional(),
+  parameters: z.array(z.any()).optional(),
+  webhookUrl: z.string().optional(),
+  message: z.string().optional(),
+  condition: z.object({
     type: z.string(),
     operator: z.string(),
     value: z.union([z.string(), z.number()]),
-  }),
-  actions?: z.array(z.lazy(() => WorkflowActionSchema)),
+  }).optional(),
+  actions: z.array(z.lazy(() => WorkflowActionSchema)).optional(),
 });
 
 export const WorkflowSchema = z.object({

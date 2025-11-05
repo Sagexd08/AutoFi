@@ -397,9 +397,7 @@ See [CLI.md](./CLI.md) for detailed CLI documentation.
 The SDK automatically masks sensitive data in logs and error messages:
 
 ```typescript
-import { DataMasker, masker } from '@celo-ai/sdk';
-
-// Create a custom masker
+import { DataMasker } from '@celo-ai/sdk';
 const masker = new DataMasker({
   strategy: 'partial', // 'full', 'partial', or 'hash'
   maskFields: ['privateKey', 'apiKey', 'password'],

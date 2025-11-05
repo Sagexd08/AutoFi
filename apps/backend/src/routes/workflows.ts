@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Router } from 'express';
 import { LangChainAgent } from '@celo-automator/langchain-agent';
 import { CeloClient } from '@celo-automator/celo-functions';
 import { WorkflowOrchestrator } from '@celo-automator/langchain-agent';
@@ -6,7 +6,7 @@ import { validateWorkflow } from '@celo-automator/core';
 import type { Workflow, WorkflowExecution } from '@celo-automator/types';
 import { generateId } from '@celo-automator/core';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // In-memory storage (replace with database in production)
 const workflows: Map<string, Workflow> = new Map();
@@ -26,7 +26,7 @@ let orchestrator: WorkflowOrchestrator | undefined;
       rpcUrl: process.env.CELO_RPC_URL,
     });
 
-    agent = await LangChainAgent.create({
+    agent = new LangChainAgent({
       id: 'main',
       type: 'langchain',
       name: 'Celo Automator Agent',
@@ -36,7 +36,9 @@ let orchestrator: WorkflowOrchestrator | undefined;
       celoClient,
     });
 
-    orchestrator = new WorkflowOrchestrator(agent);
+    if (agent) {
+      orchestrator = new WorkflowOrchestrator(agent);
+    }
   }
 })().catch((error) => {
   console.error('Failed to initialize agent:', error);
@@ -67,13 +69,13 @@ router.post('/interpret', async (req, res, next) => {
       return res.status(400).json(result);
     }
 
-    res.json({
+    return res.json({
       success: true,
       workflow: result.workflow,
       explanation: result.explanation,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -93,19 +95,19 @@ router.post('/', async (req, res, next) => {
     workflow.id = id;
     workflows.set(id, workflow);
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       workflow,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
 // Get all workflows
-router.get('/', async (req, res) => {
+router.get('/', async (_req, res) => {
   const workflowList = Array.from(workflows.values());
-  res.json({
+  return res.json({
     success: true,
     workflows: workflowList,
   });
@@ -123,7 +125,7 @@ router.get('/:id', async (req, res) => {
     });
   }
 
-  res.json({
+  return res.json({
     success: true,
     workflow,
   });
@@ -152,12 +154,12 @@ router.put('/:id', async (req, res, next) => {
     workflow.id = id;
     workflows.set(id, workflow);
 
-    res.json({
+    return res.json({
       success: true,
       workflow,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -193,7 +195,7 @@ router.post('/:id/execute', async (req, res, next) => {
     // Execute asynchronously
     orchestrator
       .executeWorkflow(workflow)
-      .then((result) => {
+      .then((result: any) => {
         execution.status = result.success ? 'completed' : 'failed';
         execution.completedAt = new Date().toISOString();
         execution.results = result.results;
@@ -203,20 +205,20 @@ router.post('/:id/execute', async (req, res, next) => {
         }
         executions.set(executionId, execution);
       })
-      .catch((error) => {
+      .catch((error: any) => {
         execution.status = 'failed';
         execution.completedAt = new Date().toISOString();
         execution.error = error.message;
         executions.set(executionId, execution);
       });
 
-    res.json({
+    return res.json({
       success: true,
       executionId,
       execution,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -232,10 +234,10 @@ router.get('/executions/:executionId', async (req, res) => {
     });
   }
 
-  res.json({
-    success: true,
-    execution,
-  });
+    return res.json({
+      success: true,
+      execution,
+    });
 });
 
 // Explain workflow
@@ -260,12 +262,12 @@ router.post('/:id/explain', async (req, res, next) => {
 
     const explanation = await orchestrator.explainWorkflow(workflow);
 
-    res.json({
+    return res.json({
       success: true,
       explanation,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 

@@ -1354,8 +1354,9 @@ Guidelines:
         this.app.use('/api', routes);
         
         try {
-          const healthRouter = await import('../routes/health.js');
-          this.app.use('/health', healthRouter.default);
+          const { createHealthRoutes } = await import('../routes/health.js');
+          const healthRoutes = createHealthRoutes(this);
+          this.app.use('/health', healthRoutes);
         } catch {
         }
         console.log('✅ Enhanced API routes added');

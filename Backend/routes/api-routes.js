@@ -412,14 +412,22 @@ export function createApiRoutes(automationSystem = null) {
           ));
         }
         
+        const safeBigInt = (value, fieldName) => {
+          try {
+            return value ? BigInt(value) : undefined;
+          } catch (error) {
+            throw new Error(`Invalid ${fieldName}: must be a valid integer`);
+          }
+        };
+        
         const txParams = {
           to: transaction.to,
-          value: transaction.value ? BigInt(transaction.value) : undefined,
+          value: safeBigInt(transaction.value, 'value'),
           data: transaction.data || undefined,
-          gas: transaction.gasLimit ? BigInt(transaction.gasLimit) : undefined,
-          gasPrice: transaction.gasPrice ? BigInt(transaction.gasPrice) : undefined,
-          maxFeePerGas: transaction.maxFeePerGas ? BigInt(transaction.maxFeePerGas) : undefined,
-          maxPriorityFeePerGas: transaction.maxPriorityFeePerGas ? BigInt(transaction.maxPriorityFeePerGas) : undefined,
+          gas: safeBigInt(transaction.gasLimit, 'gasLimit'),
+          gasPrice: safeBigInt(transaction.gasPrice, 'gasPrice'),
+          maxFeePerGas: safeBigInt(transaction.maxFeePerGas, 'maxFeePerGas'),
+          maxPriorityFeePerGas: safeBigInt(transaction.maxPriorityFeePerGas, 'maxPriorityFeePerGas'),
           nonce: transaction.nonce,
           chain: client.chain.viemChain
         };
@@ -508,7 +516,7 @@ export function createApiRoutes(automationSystem = null) {
         const balance = await client.publicClient.getBalance({ address });
         const balanceObj = {
           success: true,
-          balance: (Number(balance) / 1e18).toFixed(6),
+          balance: (Number(balance / BigInt(1e18)) + Number(balance % BigInt(1e18)) / 1e18).toFixed(6),
           raw: balance.toString(),
           decimals: 18,
           symbol: 'ETH',
@@ -556,9 +564,13 @@ export function createApiRoutes(automationSystem = null) {
         ]);
         
         const divisor = BigInt(10 ** Number(decimals));
+        const wholePart = balance / divisor;
+        const fractionalPart = balance % divisor;
+        const formattedBalance = (Number(wholePart) + Number(fractionalPart) / Number(divisor)).toFixed(6);
+        
         const balanceObj = {
           success: true,
-          balance: (Number(balance) / Number(divisor)).toFixed(6),
+          balance: formattedBalance,
           raw: balance.toString(),
           decimals: Number(decimals),
           symbol: symbol || 'UNKNOWN',
@@ -658,18 +670,17 @@ export function createApiRoutes(automationSystem = null) {
     if (!automationSystem?.codeGenerator) {
       return res.status(503).json(createErrorResponse(503, 'Code Generator not available'));
     }
-    const { source, name, chainId, constructorArgs } = req.body;
-    validateRequired({ source, name }, ['source', 'name']);
-    const result = await automationSystem.codeGenerator.deployCode({
-      source,
+    const { bytecode, name, constructorArgs } = req.body;
+    validateRequired({ bytecode, name }, ['bytecode', 'name']);
+    const result = await automationSystem.codeGenerator.deployContract({
+      bytecode,
       name,
-      chainId,
       constructorArgs
     });
     res.json(createSuccessResponse(result));
   }));
 
-  router.post('/code-generator/generate-and-deploy', strictRateLimiter, asyncHandler(async (req, res) => {
+  router.post('/code-generator/generate-and-deploy', transactionRateLimiter, asyncHandler(async (req, res) => {
     if (!automationSystem?.codeGenerator) {
       return res.status(503).json(createErrorResponse(503, 'Code Generator not available'));
     }
@@ -798,5 +809,4 @@ export function createApiRoutes(automationSystem = null) {
   return router;
 }
 
-const router = createApiRoutes();
-export default router;
+export default createApiRoutes;

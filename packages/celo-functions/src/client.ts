@@ -3,19 +3,10 @@ import {
   createWalletClient,
   http,
   Address,
-  Hash,
   PublicClient,
   WalletClient,
 } from 'viem';
 import { celo, celoAlfajores } from 'viem/chains';
-import type {
-  TransactionResult,
-  TokenBalance,
-  TransactionRequest,
-  EventFilter,
-  ContractCall,
-  DeploymentResult,
-} from '@celo-automator/types';
 
 const CELO_CHAINS = {
   alfajores: celoAlfajores,
@@ -42,7 +33,7 @@ export class CeloClient {
     this.publicClient = createPublicClient({
       chain: this.chain,
       transport: http(rpcUrl),
-    });
+    }) as PublicClient;
 
     if (config.privateKey) {
       this.walletClient = createWalletClient({
