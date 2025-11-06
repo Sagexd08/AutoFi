@@ -1,17 +1,26 @@
 import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
 
-export class BufferMemory {
-  private chatHistory: Array<{
-    role: 'user' | 'assistant' | 'system';
-    content: string;
-    timestamp: string;
-  }> = [];
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: string;
+}
 
-  private recentActions: Array<{
-    action: string;
-    result: any;
-    timestamp: string;
-  }> = [];
+export interface Action {
+  action: string;
+  result: any;
+  timestamp: string;
+}
+
+export interface MemorySnapshot {
+  chatHistory: ChatMessage[];
+  recentActions: Action[];
+}
+
+export class BufferMemory {
+  private chatHistory: ChatMessage[] = [];
+
+  private recentActions: Action[] = [];
 
   addMessage(role: 'user' | 'assistant' | 'system', content: string) {
     this.chatHistory.push({
@@ -58,7 +67,7 @@ export class BufferMemory {
     this.chatHistory = [];
     this.recentActions = [];
   }
-  toMemory() {
+  toMemory(): MemorySnapshot {
     return {
       chatHistory: this.chatHistory,
       recentActions: this.recentActions,

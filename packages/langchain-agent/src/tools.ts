@@ -10,7 +10,7 @@ import {
   readContract,
   getTransactionStatus,
 } from '@celo-automator/celo-functions';
-import type { Address } from 'viem';
+import type { Address, Hash } from 'viem';
 
 export function createTools(celoClient?: CeloClient) {
   if (!celoClient) {
@@ -153,7 +153,7 @@ export function createTools(celoClient?: CeloClient) {
         txHash: z.string().describe('The transaction hash'),
       }),
       func: async ({ txHash }) => {
-        const status = await getTransactionStatus(celoClient, txHash as `0x${string}`);
+        const status = await getTransactionStatus(celoClient, txHash as Hash);
         return JSON.stringify({
           success: true,
           ...status,
