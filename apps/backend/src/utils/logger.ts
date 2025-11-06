@@ -23,7 +23,7 @@ class Logger {
       level: level.toUpperCase(),
       context: this.context,
       message,
-      ...meta,
+      ...(meta && Object.keys(meta).length > 0 ? { meta } : {}),
     };
 
     if (isProduction) {

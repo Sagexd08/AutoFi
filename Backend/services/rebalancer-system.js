@@ -1,6 +1,31 @@
 import { EventEmitter } from 'events';
 import logger from '../utils/logger.js';
 
+/**
+ * Sanitizes error objects for API responses by removing sensitive information
+ * like stack traces and internal paths
+ */
+function sanitizeError(error) {
+  if (!error) return null;
+  
+  const sanitized = {
+    name: error.name || 'Error',
+    message: error.message || String(error)
+  };
+  
+  // Optionally include error code if available
+  if (error.code) {
+    sanitized.errorCode = error.code;
+  }
+  
+  // Truncate message if too long (max 500 chars)
+  if (sanitized.message && sanitized.message.length > 500) {
+    sanitized.message = sanitized.message.substring(0, 500) + '...';
+  }
+  
+  return sanitized;
+}
+
 export class RebalancerSystem extends EventEmitter {
   constructor(config = {}) {
     super();
@@ -124,11 +149,7 @@ export class RebalancerSystem extends EventEmitter {
         performance,
         recommendations,
         isMockData,
-        balanceError: balanceError ? {
-          message: balanceError.message,
-          name: balanceError.name,
-          stack: balanceError.stack
-        } : null,
+        balanceError: sanitizeError(balanceError),
         timestamp: new Date().toISOString()
       };
       this.portfolios.set(walletAddress, {

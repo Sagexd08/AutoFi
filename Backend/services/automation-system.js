@@ -93,7 +93,7 @@ export class CombinedAutomationSystem extends EventEmitter {
     this.initializeEnhancedFeatures().catch((error) => {
       logger.error('Failed to initialize enhanced features', { error: error.message });
     });
-    this.initializeExpress().catch((error) => {
+    this._expressInitPromise = this.initializeExpress().catch((error) => {
       logger.error('Failed to initialize Express', { error: error.message });
       this.expressInitialized = false;
     });
@@ -1961,7 +1961,11 @@ Guidelines:
     return stats;
   }
 
-  start() {
+  async start() {
+    if (this._expressInitPromise) {
+      await this._expressInitPromise;
+    }
+
     if (!this.expressInitialized || !this.app) {
       throw new Error('Express application not initialized. Cannot start server. Ensure initializeExpress() completed successfully.');
     }
@@ -2205,51 +2209,53 @@ const currentFile = fileURLToPath(import.meta.url);
 const isMainModule = currentFile === process.argv[1];
 
 if (isMainModule) {
-  try {
-    const config = {
-      port: process.env.PORT || 3001,
-      geminiApiKey: process.env.GEMINI_API_KEY,
-      privateKey: process.env.PRIVATE_KEY,
-      network: process.env.NETWORK || 'alfajores',
-      rpcUrl: process.env.RPC_URL,
-      alchemyApiKey: process.env.ALCHEMY_API_KEY,
-      enableMCP: process.env.ENABLE_MCP !== 'false',
-      enableAIAgents: process.env.ENABLE_AI_AGENTS !== 'false',
-      enableAdvancedFeatures: process.env.ENABLE_ADVANCED_FEATURES !== 'false'
-    };
+  (async () => {
+    try {
+      const config = {
+        port: process.env.PORT || 3001,
+        geminiApiKey: process.env.GEMINI_API_KEY,
+        privateKey: process.env.PRIVATE_KEY,
+        network: process.env.NETWORK || 'alfajores',
+        rpcUrl: process.env.RPC_URL,
+        alchemyApiKey: process.env.ALCHEMY_API_KEY,
+        enableMCP: process.env.ENABLE_MCP !== 'false',
+        enableAIAgents: process.env.ENABLE_AI_AGENTS !== 'false',
+        enableAdvancedFeatures: process.env.ENABLE_ADVANCED_FEATURES !== 'false'
+      };
 
-    logger.info('Starting Advanced AI Automation System v5.0.0 - Enterprise');
+      logger.info('Starting Advanced AI Automation System v5.0.0 - Enterprise');
 
-    const automation = new CombinedAutomationSystem(config);
-    automation.start();
+      const automation = new CombinedAutomationSystem(config);
+      await automation.start();
 
-    process.on('SIGINT', async () => {
-      logger.info('SIGINT received - initiating graceful shutdown...');
-      await automation.shutdown();
-      process.exit(0);
-    });
+      process.on('SIGINT', async () => {
+        logger.info('SIGINT received - initiating graceful shutdown...');
+        await automation.shutdown();
+        process.exit(0);
+      });
 
-    process.on('SIGTERM', async () => {
-      logger.info('SIGTERM received - initiating graceful shutdown...');
-      await automation.shutdown();
-      process.exit(0);
-    });
+      process.on('SIGTERM', async () => {
+        logger.info('SIGTERM received - initiating graceful shutdown...');
+        await automation.shutdown();
+        process.exit(0);
+      });
 
-    process.on('uncaughtException', async (error) => {
-      logger.error('Uncaught Exception', { error: error.message, stack: error.stack });
-      await automation.shutdown();
+      process.on('uncaughtException', async (error) => {
+        logger.error('Uncaught Exception', { error: error.message, stack: error.stack });
+        await automation.shutdown();
+        process.exit(1);
+      });
+
+      process.on('unhandledRejection', async (reason, promise) => {
+        logger.error('Unhandled Rejection', { promise, reason: reason?.message || reason });
+        await automation.shutdown();
+        process.exit(1);
+      });
+    } catch (error) {
+      logger.error('Failed to start advanced automation system', { error: error.message });
       process.exit(1);
-    });
-
-    process.on('unhandledRejection', async (reason, promise) => {
-      logger.error('Unhandled Rejection', { promise, reason: reason?.message || reason });
-      await automation.shutdown();
-      process.exit(1);
-    });
-  } catch (error) {
-    logger.error('Failed to start advanced automation system', { error: error.message });
-    process.exit(1);
-  }
+    }
+  })();
 }
 
 export default CombinedAutomationSystem;

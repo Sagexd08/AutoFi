@@ -98,6 +98,9 @@ jobs:
       with:
         node-version: '18'
         registry-url: 'https://registry.npmjs.org'
+        always-auth: true
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     - name: Install dependencies
       working-directory: Backend/sdk
       run: npm ci

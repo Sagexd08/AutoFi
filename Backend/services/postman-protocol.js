@@ -413,18 +413,6 @@ export class PostmanProtocol extends EventEmitter {
   }
   replaceVariablesInObject(obj, variable) {
     if (typeof obj === 'string') {
-      return obj.replace(new RegExp(`{{${variable.key}}}`, 'g'), variable.value);
-    } else if (typeof obj === 'object' && obj !== null) {
-      const newObj = Array.isArray(obj) ? [] : {};
-      for (const key in obj) {
-        newObj[key] = this.replaceVariablesInObject(obj[key], variable);
-      }
-      return newObj;
-    }
-    return obj;
-  }
-  replaceVariablesInObject(obj, variable) {
-    if (typeof obj === 'string') {
       const escapedKey = variable.key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       return obj.replace(new RegExp(`{{${escapedKey}}}`, 'g'), variable.value);
     } else if (typeof obj === 'object' && obj !== null) {
