@@ -19,7 +19,6 @@ describe('Celo Functions', () => {
     });
 
     it('should throw error if client is invalid', async () => {
-      // Mock client that throws error
       const invalidClient = {} as CeloClient;
       await expect(functions.getBalance(invalidClient, mockAddress)).rejects.toThrow();
     });

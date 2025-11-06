@@ -7,11 +7,9 @@ import type { Workflow, WorkflowExecution } from '@celo-automator/types';
 import { generateId } from '@celo-automator/core';
 
 const router: Router = express.Router();
-// In-memory storage (replace with database in production)
 const workflows: Map<string, Workflow> = new Map();
 const executions: Map<string, WorkflowExecution> = new Map();
 
-// Initialize Celo client and agent
 let celoClient: CeloClient | undefined;
 let agent: LangChainAgent | undefined;
 let orchestrator: WorkflowOrchestrator | undefined;
@@ -38,11 +36,9 @@ if (process.env.CELO_PRIVATE_KEY) {
     console.log('✅ Workflow orchestrator initialized successfully');
   } catch (error) {
     console.error('❌ Failed to initialize workflow orchestrator:', error);
-    // Orchestrator will remain undefined, endpoints will return 503
   }
 }
 
-// Create workflow from natural language
 router.post('/interpret', async (req, res, next) => {
   try {
     const { input, context } = req.body;
@@ -77,7 +73,6 @@ router.post('/interpret', async (req, res, next) => {
   }
 });
 
-// Create workflow
 router.post('/', async (req, res, next) => {
   try {
     const workflow = req.body as Workflow;
@@ -92,7 +87,6 @@ router.post('/', async (req, res, next) => {
     let id: string;
     
     if (workflow.id) {
-      // Client provided an ID - check for collision
       if (workflows.has(workflow.id)) {
         return res.status(409).json({
           success: false,
@@ -101,9 +95,8 @@ router.post('/', async (req, res, next) => {
       }
       id = workflow.id;
     } else {
-      // Generate ID and ensure it doesn't collide
       let attempts = 0;
-      const maxAttempts = 100; // Prevent infinite loop
+      const maxAttempts = 100;
       do {
         id = generateId('workflow');
         attempts++;
@@ -128,7 +121,6 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-// Get all workflows
 router.get('/', async (_req, res) => {
   const workflowList = Array.from(workflows.values());
   return res.json({
@@ -137,7 +129,6 @@ router.get('/', async (_req, res) => {
   });
 });
 
-// Get workflow by ID
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
   const workflow = workflows.get(id);
@@ -155,7 +146,6 @@ router.get('/:id', async (req, res) => {
   });
 });
 
-// Update workflow
 router.put('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -187,7 +177,6 @@ router.put('/:id', async (req, res, next) => {
   }
 });
 
-// Execute workflow
 router.post('/:id/execute', async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -216,7 +205,6 @@ router.post('/:id/execute', async (req, res, next) => {
     };
     executions.set(executionId, execution);
 
-    // Execute asynchronously
     orchestrator
       .executeWorkflow(workflow)
       .then((result: any) => {
@@ -246,7 +234,6 @@ router.post('/:id/execute', async (req, res, next) => {
   }
 });
 
-// Get execution status
 router.get('/executions/:executionId', async (req, res) => {
   const { executionId } = req.params;
   const execution = executions.get(executionId);
@@ -264,7 +251,6 @@ router.get('/executions/:executionId', async (req, res) => {
     });
 });
 
-// Explain workflow
 router.post('/:id/explain', async (req, res, next) => {
   try {
     const { id } = req.params;

@@ -1,4 +1,3 @@
-// Core types
 export * from './core/index.js';
 export * from './workflow/index.js';
 export * from './blockchain/index.js';

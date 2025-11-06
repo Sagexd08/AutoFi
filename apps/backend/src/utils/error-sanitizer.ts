@@ -1,7 +1,3 @@
-/**
- * Utility to sanitize errors and redact sensitive information
- */
-
 const SENSITIVE_FIELDS = [
   'password',
   'secret',
@@ -33,11 +29,8 @@ const SENSITIVE_PATTERNS = [
   /authorization/i,
 ];
 
-/**
- * Redacts sensitive fields from an object
- */
 export function redactSensitiveFields(obj: any, depth = 0): any {
-  if (depth > 10) return '[Max depth reached]'; // Prevent infinite recursion
+  if (depth > 10) return '[Max depth reached]';
   if (obj === null || obj === undefined) return obj;
   
   if (typeof obj !== 'object') {
@@ -52,7 +45,6 @@ export function redactSensitiveFields(obj: any, depth = 0): any {
   for (const [key, value] of Object.entries(obj)) {
     const lowerKey = key.toLowerCase();
     
-    // Check if key matches sensitive patterns
     const isSensitive = SENSITIVE_FIELDS.some(field => lowerKey.includes(field)) ||
                        SENSITIVE_PATTERNS.some(pattern => pattern.test(lowerKey));
 
@@ -68,9 +60,6 @@ export function redactSensitiveFields(obj: any, depth = 0): any {
   return redacted;
 }
 
-/**
- * Sanitizes error object for logging
- */
 export function sanitizeErrorForLogging(err: any): any {
   const sanitized: Record<string, any> = {
     name: err.name,
@@ -79,27 +68,22 @@ export function sanitizeErrorForLogging(err: any): any {
     statusCode: err.statusCode || err.status,
   };
 
-  // Only include stack in non-production
   if (process.env.NODE_ENV !== 'production' && err.stack) {
-    // Remove file paths from stack trace
     sanitized.stack = err.stack
       .split('\n')
       .map((line: string) => {
-        // Remove absolute file paths, keep only file names
         return line.replace(/\([^)]*[/\\]([^/\\]+\.(js|ts|tsx|jsx)):\d+:\d+\)/g, '($1:REDACTED)');
       })
       .join('\n');
   }
 
-  // Redact sensitive fields from error details
   if (err.details) {
     sanitized.details = redactSensitiveFields(err.details);
   }
 
-  // Redact sensitive fields from error object itself
   const errorObj = { ...err };
-  delete errorObj.stack; // Already handled above
-  delete errorObj.details; // Already handled above
+  delete errorObj.stack;
+  delete errorObj.details;
   
   const additionalFields = redactSensitiveFields(errorObj);
   Object.assign(sanitized, additionalFields);
@@ -107,9 +91,6 @@ export function sanitizeErrorForLogging(err: any): any {
   return sanitized;
 }
 
-/**
- * Generates a unique error code for correlation
- */
 export function generateErrorCode(): string {
   return `ERR-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
 }

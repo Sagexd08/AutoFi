@@ -15,7 +15,6 @@ export async function configCommand(options: any) {
   } else if (options.get) {
     console.log(chalk.cyan(`${options.get}: ${config?.[options.get] || 'Not set'}`));
   } else if (options.set) {
-    // Handle options.set as an array
     if (!Array.isArray(options.set)) {
       console.error(chalk.red('Error: --set requires both key and value'));
       process.exit(1);
@@ -35,7 +34,6 @@ export async function configCommand(options: any) {
       process.exit(1);
     }
 
-    // Read existing config or create new one
     let existingConfig: Record<string, any> = {};
     if (existsSync(CONFIG_FILE)) {
       try {
@@ -46,7 +44,6 @@ export async function configCommand(options: any) {
         console.error(chalk.red(`❌ Configuration file is corrupted: ${errorMessage}`));
         console.error(chalk.yellow(`   Falling back to empty configuration.`));
         
-        // Backup the corrupted file
         try {
           const backupPath = `${CONFIG_FILE}.corrupted.${Date.now()}`;
           renameSync(CONFIG_FILE, backupPath);
@@ -54,15 +51,11 @@ export async function configCommand(options: any) {
         } catch (backupError) {
           console.error(chalk.yellow(`   Warning: Could not backup corrupted config file`));
         }
-        
-        // existingConfig is already set to {} as fallback
       }
     }
 
-    // Update the config
     existingConfig[key] = value;
 
-    // Write back to file
     try {
       writeFileSync(CONFIG_FILE, JSON.stringify(existingConfig, null, 2));
       console.log(chalk.green(`✅ Configuration updated: ${key} = ${value}`));

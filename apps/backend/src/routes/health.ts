@@ -2,7 +2,6 @@ import express, { Router } from 'express';
 
 const router: Router = express.Router();
 
-// Health check
 router.get('/', async (_req, res) => {
   res.json({
     success: true,

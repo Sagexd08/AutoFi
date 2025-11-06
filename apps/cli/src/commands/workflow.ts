@@ -23,7 +23,6 @@ export async function workflowCommand(options: any) {
   } else if (options.describe) {
     await describeWorkflow(apiUrl, options.describe);
   } else {
-    // Interactive mode
     const { action } = await inquirer.prompt([
       {
         type: 'list',
@@ -153,10 +152,8 @@ async function executeWorkflow(
     console.log(chalk.gray(`Status: ${execution.status}`));
     console.log(chalk.gray(`Timeout: ${timeoutMs / 1000}s, Max retries: ${maxRetries}, Poll interval: ${pollIntervalMs / 1000}s`));
 
-    // Poll for completion
     let status = execution.status;
     while (status === 'running') {
-      // Check timeout
       const elapsed = Date.now() - startTime;
       if (elapsed >= timeoutMs) {
         console.log(chalk.yellow(`\n⏱️  Timeout exceeded (${timeoutMs / 1000}s)`));
@@ -165,20 +162,16 @@ async function executeWorkflow(
         );
       }
 
-      // Wait before polling (use retry backoff if we're in retry mode, otherwise use poll interval)
       const waitTime = consecutiveRetries > 0 ? retryBackoffMs : pollIntervalMs;
-      // Ensure we never wait past the timeout deadline
       const remainingMs = timeoutMs - elapsed;
       const actualWaitTime = Math.min(remainingMs, waitTime);
       await new Promise((resolve) => setTimeout(resolve, actualWaitTime));
 
-      // Fetch status with retry handling
       try {
         const statusResponse = await axios.get(
           `${apiUrl}/api/workflows/executions/${execution.id}`
         );
         
-        // Reset retry counter and backoff on successful fetch
         consecutiveRetries = 0;
         retryBackoffMs = pollIntervalMs;
         
@@ -209,11 +202,9 @@ async function executeWorkflow(
           );
         }
 
-        // Exponential backoff for retries (capped at maxBackoffMs)
         retryBackoffMs = Math.min(retryBackoffMs * 2, maxBackoffMs);
         console.log(chalk.gray(`   Retrying in ${retryBackoffMs / 1000}s...`));
         
-        // Continue loop to retry (will use retryBackoffMs on next iteration)
         continue;
       }
     }
@@ -222,7 +213,6 @@ async function executeWorkflow(
   } catch (error: any) {
     console.error(chalk.red('\n❌ Error executing workflow:'), error.message);
     
-    // Log latest known execution details
     if (lastKnownExecution) {
       console.log(chalk.yellow('\n📊 Latest known execution details:'));
       console.log(chalk.cyan(`  Execution ID: ${lastKnownExecution.id}`));
@@ -232,7 +222,6 @@ async function executeWorkflow(
       }
     }
     
-    // Re-throw to allow caller to handle exit codes
     throw error;
   }
 }

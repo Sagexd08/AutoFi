@@ -1,8 +1,3 @@
-/**
- * Simple application logger
- * Logs structured messages to console (can be replaced with winston/pino later)
- */
-
 const isProduction = process.env.NODE_ENV === 'production';
 
 interface LogMeta {
@@ -30,7 +25,6 @@ class Logger {
       return JSON.stringify(logEntry);
     }
 
-    // Pretty print for development
     const colorCodes: Record<string, string> = {
       error: '\x1b[31m',
       warn: '\x1b[33m',

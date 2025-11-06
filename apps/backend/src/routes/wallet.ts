@@ -16,7 +16,6 @@ if (process.env.CELO_PRIVATE_KEY) {
   });
 }
 
-// Get balance
 router.get('/balance/:address', async (req, res, next) => {
   try {
     const { address } = req.params;

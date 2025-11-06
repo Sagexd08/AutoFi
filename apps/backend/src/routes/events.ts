@@ -2,7 +2,6 @@ import express, { Router } from 'express';
 
 const router: Router = express.Router();
 
-// Event subscription endpoints (placeholder for future implementation)
 router.post('/subscribe', async (_req, res) => {
   res.json({
     success: true,
