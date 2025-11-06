@@ -3,6 +3,7 @@ import { LangChainAgent } from './agent.js';
 import { WorkflowOrchestrator } from './orchestrator.js';
 import { CeloClient } from '@celo-automator/celo-functions';
 import type { Workflow } from '@celo-automator/types';
+import { isSuccessResult, hasTransactionHash } from './memory.js';
 
 describe('LangChainAgent - Advanced', () => {
   let celoClient: CeloClient;
@@ -95,7 +96,14 @@ describe('LangChainAgent - Advanced', () => {
       const actions = memory.getRecentActions();
       expect(actions.length).toBe(2);
       expect(actions[0].action).toBe('transfer');
-      expect(actions[0].result.success).toBe(true);
+      if (isSuccessResult(actions[0].result)) {
+        expect(actions[0].result.success).toBe(true);
+        if (hasTransactionHash(actions[0].result)) {
+          expect(actions[0].result.hash).toBe('0x123');
+        }
+      } else {
+        throw new Error('Expected result to have success property');
+      }
     });
   });
 

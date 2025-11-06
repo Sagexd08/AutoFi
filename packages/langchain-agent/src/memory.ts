@@ -6,10 +6,58 @@ export interface ChatMessage {
   timestamp: string;
 }
 
+/**
+ * Known result shapes for Action results
+ */
+export type ActionResult =
+  | { success: true; transactionHash?: string; hash?: string; error?: never }
+  | { success: true; balance: string; balanceFormatted?: string; address?: string; error?: never }
+  | { success: true; result?: unknown; error?: never }
+  | { success: false; error: string; transactionHash?: never; hash?: never; balance?: never; result?: never }
+  | { success: boolean; [key: string]: unknown }
+  | Record<string, unknown>
+  | unknown;
+
 export interface Action {
   action: string;
-  result: any;
+  result: ActionResult;
   timestamp: string;
+}
+
+/**
+ * Type guard to check if result has a success property
+ */
+export function hasSuccess(result: ActionResult): result is { success: boolean; [key: string]: unknown } {
+  return typeof result === 'object' && result !== null && 'success' in result;
+}
+
+/**
+ * Type guard to check if result is a success result
+ */
+export function isSuccessResult(result: ActionResult): result is { success: true; [key: string]: unknown } {
+  return hasSuccess(result) && result.success === true;
+}
+
+/**
+ * Type guard to check if result is an error result
+ */
+export function isErrorResult(result: ActionResult): result is { success: false; error: string } {
+  return hasSuccess(result) && result.success === false && typeof result.error === 'string';
+}
+
+/**
+ * Type guard to check if result has a transaction hash
+ */
+export function hasTransactionHash(result: ActionResult): result is { transactionHash?: string; hash?: string; [key: string]: unknown } {
+  if (typeof result !== 'object' || result === null) return false;
+  return 'transactionHash' in result || 'hash' in result;
+}
+
+/**
+ * Type guard to check if result has a balance
+ */
+export function hasBalance(result: ActionResult): result is { balance: string; [key: string]: unknown } {
+  return typeof result === 'object' && result !== null && 'balance' in result && typeof (result as { balance: unknown }).balance === 'string';
 }
 
 export interface MemorySnapshot {
@@ -35,7 +83,7 @@ export class BufferMemory {
     }
   }
 
-  addAction(action: string, result: any) {
+  addAction(action: string, result: ActionResult) {
     this.recentActions.push({
       action,
       result,

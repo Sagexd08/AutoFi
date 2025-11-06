@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { BufferMemory } from '../src/memory.js';
+import { BufferMemory, isSuccessResult } from '../src/memory.js';
 
 describe('BufferMemory', () => {
   let memory: BufferMemory;
@@ -46,7 +46,11 @@ describe('BufferMemory', () => {
     const actions = memory.getRecentActions();
     expect(actions.length).toBe(1);
     expect(actions[0].action).toBe('transfer');
-    expect(actions[0].result.success).toBe(true);
+    if (isSuccessResult(actions[0].result)) {
+      expect(actions[0].result.success).toBe(true);
+    } else {
+      throw new Error('Expected result to have success property');
+    }
   });
 
   it('should limit recent actions to 20', () => {
