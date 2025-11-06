@@ -13,7 +13,6 @@ module.exports = {
     'prettier',
   ],
   rules: {
-    // TypeScript specific rules
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/explicit-function-return-type': 'warn',
     '@typescript-eslint/explicit-module-boundary-types': 'warn',
@@ -55,7 +54,6 @@ module.exports = {
     '@typescript-eslint/prefer-return-this-type': 'error',
     '@typescript-eslint/sort-type-constituents': 'error',
 
-    // General rules
     'no-console': 'warn',
     'no-debugger': 'error',
     'no-alert': 'error',
@@ -84,7 +82,6 @@ module.exports = {
     'radix': 'error',
     'yoda': 'error',
 
-    // Prettier integration
     'prettier/prettier': 'error',
   },
   overrides: [

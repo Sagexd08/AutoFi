@@ -3,13 +3,9 @@ import logger from '../utils/logger.js';
 import { getRequestId } from '../utils/request-id.js';
 import config from '../config/env.js';
 
-/**
- * Enhanced error handler middleware
- */
 export function errorHandler(err, req, res, next) {
   const requestId = getRequestId(req);
   
-  // Log error
   const logMeta = {
     requestId,
     method: req.method,
@@ -31,7 +27,6 @@ export function errorHandler(err, req, res, next) {
     logger.error(`Unexpected error: ${err.message}`, logMeta);
   }
 
-  // Handle Zod validation errors
   if (err.name === 'ZodError') {
     return res.status(400).json({
       success: false,
@@ -48,7 +43,6 @@ export function errorHandler(err, req, res, next) {
     });
   }
 
-  // Prepare error response
   const statusCode = err.statusCode || err.status || 500;
   const response = {
     success: false,
@@ -61,7 +55,6 @@ export function errorHandler(err, req, res, next) {
     },
   };
 
-  // Don't expose stack trace in production
   if (config.isDevelopment && err.stack) {
     response.error.stack = err.stack;
   }

@@ -1843,12 +1843,10 @@ Guidelines:
   }
 
   async setupErrorHandlers() {
-    // Error handling middleware (if available)
     try {
       const { errorHandler } = await import('../middleware/error-handler.js');
       this.app.use(errorHandler);
     } catch {
-      // Fallback error handler
       this.app.use((err, req, res, next) => {
         res.status(err.status || 500).json({
           success: false,
@@ -1862,7 +1860,6 @@ Guidelines:
       });
     }
 
-    // 404 handler must come after error handler
     this.app.use('*', (req, res) => {
       res.status(404).json({
         success: false,

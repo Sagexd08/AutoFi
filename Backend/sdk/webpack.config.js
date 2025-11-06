@@ -10,7 +10,6 @@ module.exports = {
     filename: '[name].bundle.js',
     library: {
       name: (entryData) => {
-        // Generate unique library name based on entry point
         const entryName = entryData.chunk.name;
         const capitalizedName = entryName.charAt(0).toUpperCase() + entryName.slice(1);
         return `CeloAISDK${capitalizedName}`;

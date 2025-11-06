@@ -1,10 +1,6 @@
 import { EventEmitter } from 'events';
 import logger from '../utils/logger.js';
 
-/**
- * Sanitizes error objects for API responses by removing sensitive information
- * like stack traces and internal paths
- */
 function sanitizeError(error) {
   if (!error) return null;
   
@@ -13,12 +9,10 @@ function sanitizeError(error) {
     message: error.message || String(error)
   };
   
-  // Optionally include error code if available
   if (error.code) {
     sanitized.errorCode = error.code;
   }
   
-  // Truncate message if too long (max 500 chars)
   if (sanitized.message && sanitized.message.length > 500) {
     sanitized.message = sanitized.message.substring(0, 500) + '...';
   }
@@ -34,7 +28,6 @@ export class RebalancerSystem extends EventEmitter {
       rebalanceThreshold: config.rebalanceThreshold || 0.05,
       minRebalanceAmount: config.minRebalanceAmount || 0.01,
       maxSlippage: config.maxSlippage || 0.01,
-      // Default fee configurations (can be overridden)
       defaultProtocolFee: config.defaultProtocolFee || 0.003, // 0.3% default protocol fee
       defaultLiquidityProviderFee: config.defaultLiquidityProviderFee || 0.003, // 0.3% default LP fee
       defaultGasPrice: config.defaultGasPrice || 0.00001, // Default gas price in CELO
@@ -178,7 +171,6 @@ export class RebalancerSystem extends EventEmitter {
       this.emit('rebalancingStarted', { walletAddress, targetAllocation });
       const analysis = await this.analyzePortfolio({ walletAddress, targetAllocation });
       
-      // Handle mock data scenario
       if (analysis.isMockData) {
         logger.warn('Rebalancing attempted with mock data', {
           walletAddress,
@@ -212,8 +204,6 @@ export class RebalancerSystem extends EventEmitter {
       );
       const { transactions, rebalancingRequired } = transactionResult;
       
-      // Comprehensive cost estimation: includes gas, protocol fees, slippage, and spread/LP fees
-      // Tracks missing components to warn callers when estimate may be incomplete
       const costBreakdown = {
         total: 0,
         gasCost: 0,
@@ -224,13 +214,11 @@ export class RebalancerSystem extends EventEmitter {
       };
       
       transactions.forEach((tx) => {
-        // Explicit validation of tx.amount
         const parsedAmount = parseFloat(tx.amount);
         let amount = null;
         let amountValidationFailed = false;
         let validationReason = null;
         
-        // Validate: must be a finite number and positive (> 0)
         if (tx.amount === undefined || tx.amount === null) {
           amountValidationFailed = true;
           validationReason = `tx.amount is ${tx.amount === undefined ? 'undefined' : 'null'}`;
@@ -244,7 +232,6 @@ export class RebalancerSystem extends EventEmitter {
           amount = parsedAmount;
         }
         
-        // If validation failed, skip cost calculations and record in missingComponents
         if (amountValidationFailed) {
           logger.warn('Transaction amount validation failed - skipping cost calculations', {
             transaction: `${tx.from} -> ${tx.to}`,
@@ -266,7 +253,6 @@ export class RebalancerSystem extends EventEmitter {
         let txLpFee = 0;
         const txMissingComponents = [];
         
-        // 1. Gas cost: gasPrice * gasEstimate (or gasUsed if available)
         const gasEstimate = tx.gasUsed || tx.estimatedGas || 0;
         const gasPrice = tx.gasPrice || this.config.defaultGasPrice;
         if (gasEstimate > 0 && gasPrice > 0) {
@@ -275,18 +261,15 @@ export class RebalancerSystem extends EventEmitter {
           txMissingComponents.push('gasEstimate');
         }
         
-        // 2. Protocol/fee amounts from trade quote (if available)
         if (tx.quote && typeof tx.quote.protocolFee === 'number') {
           txProtocolFee = tx.quote.protocolFee;
         } else if (tx.protocolFee !== undefined) {
           txProtocolFee = tx.protocolFee;
         } else {
-          // Fall back to default protocol fee as percentage of amount
           txProtocolFee = amount * this.config.defaultProtocolFee;
           txMissingComponents.push('protocolFee');
         }
         
-        // 3. Slippage impact: estimated from quote vs expected price
         if (tx.quote && tx.quote.expectedPrice && tx.quote.actualPrice) {
           const expectedValue = amount * tx.quote.expectedPrice;
           const actualValue = amount * tx.quote.actualPrice;
@@ -294,15 +277,12 @@ export class RebalancerSystem extends EventEmitter {
         } else if (tx.slippageImpact !== undefined) {
           txSlippageImpact = tx.slippageImpact;
         } else if (tx.quote && tx.quote.slippage !== undefined) {
-          // Calculate slippage impact from percentage
           txSlippageImpact = amount * (tx.quote.slippage || 0);
         } else {
-          // Estimate slippage using maxSlippage config
           txSlippageImpact = amount * this.config.maxSlippage;
           txMissingComponents.push('slippageImpact');
         }
         
-        // 4. Spread or liquidity provider fees
         if (tx.quote && typeof tx.quote.liquidityProviderFee === 'number') {
           txLpFee = tx.quote.liquidityProviderFee;
         } else if (tx.liquidityProviderFee !== undefined) {
@@ -310,7 +290,6 @@ export class RebalancerSystem extends EventEmitter {
         } else if (tx.spread !== undefined) {
           txLpFee = amount * tx.spread;
         } else {
-          // Fall back to default LP fee as percentage of amount
           txLpFee = amount * this.config.defaultLiquidityProviderFee;
           txMissingComponents.push('liquidityProviderFee');
         }
@@ -331,7 +310,6 @@ export class RebalancerSystem extends EventEmitter {
       costBreakdown.total = costBreakdown.gasCost + costBreakdown.protocolFees + 
                             costBreakdown.slippageImpact + costBreakdown.liquidityProviderFees;
       
-      // Surface warning when cost components are unavailable
       const estimatedCost = costBreakdown.total;
       const hasMissingComponents = costBreakdown.missingComponents.length > 0;
       if (hasMissingComponents) {
@@ -426,25 +404,20 @@ export class RebalancerSystem extends EventEmitter {
       }
     });
     
-    // Separate buy and sell adjustments
     const buyAdjustments = adjustments.filter(a => a.action === 'buy');
     const sellAdjustments = adjustments.filter(a => a.action === 'sell');
     
-    // Track which adjustments have been fully used
     const usedAdjustments = new Set();
     
-    // Pair buy adjustments with sell adjustments
     for (const buyAdj of buyAdjustments) {
       if (usedAdjustments.has(buyAdj.token)) continue;
       
-      // Find available sell adjustments (not used and different token)
       const availableSells = sellAdjustments.filter(
         sellAdj => !usedAdjustments.has(sellAdj.token) && sellAdj.token !== buyAdj.token && sellAdj.remaining > 0
       );
       
       if (availableSells.length === 0) continue;
       
-      // Try to pair with sell adjustments
       let buyRemaining = buyAdj.remaining;
       for (const sellAdj of availableSells) {
         if (buyRemaining <= 0) break;
@@ -459,18 +432,15 @@ export class RebalancerSystem extends EventEmitter {
             estimatedGas: 0.001
           });
           
-          // Update remaining amounts
           buyRemaining -= amountToSwap;
           sellAdj.remaining -= amountToSwap;
           
-          // Mark sell adjustment as used if fully consumed
           if (sellAdj.remaining <= this.config.minRebalanceAmount) {
             usedAdjustments.add(sellAdj.token);
           }
         }
       }
       
-      // Mark buy adjustment as used if fully consumed
       if (buyRemaining <= this.config.minRebalanceAmount) {
         usedAdjustments.add(buyAdj.token);
       } else {
@@ -478,13 +448,11 @@ export class RebalancerSystem extends EventEmitter {
       }
     }
     
-    // Validate all transactions: ensure non-zero amounts and different from/to tokens
     const validTransactions = transactions.filter(tx => {
       const amount = parseFloat(tx.amount);
       return amount > 0 && tx.from !== tx.to && tx.estimatedGas > 0;
     });
     
-    // Determine if rebalancing is required
     const rebalancingRequired = adjustments.length > 0;
     const canExecute = validTransactions.length > 0;
     

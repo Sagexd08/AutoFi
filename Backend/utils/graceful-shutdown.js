@@ -3,23 +3,19 @@
 
 import logger from './logger.js';
 
-// Module-scoped guard to prevent concurrent shutdown invocations
 let shutdownPromise = null;
 
 export function setupGracefulShutdown({ onShutdown, timeout = 30000, server }) {
   const shutdown = async (signal) => {
-    // If shutdown is already in progress, await the existing promise
     if (shutdownPromise) {
       logger.info(`Shutdown already in progress, waiting for existing shutdown (triggered by ${signal})...`);
       try {
         await shutdownPromise;
       } catch (error) {
-        // Ignore errors from the existing shutdown, it will handle its own error reporting
       }
       return;
     }
 
-    // Create and store the shutdown promise immediately to prevent concurrent invocations
     shutdownPromise = (async () => {
       logger.info(`Received ${signal}, starting graceful shutdown...`);
 
@@ -42,7 +38,6 @@ export function setupGracefulShutdown({ onShutdown, timeout = 30000, server }) {
           ]);
         } catch (error) {
           logger.error('Error closing server', { error: error.message, stack: error.stack });
-          // Continue with shutdown even if server close fails
         }
       }
       
@@ -65,11 +60,9 @@ export function setupGracefulShutdown({ onShutdown, timeout = 30000, server }) {
       }
     })();
 
-    // Await the shutdown promise
     try {
       await shutdownPromise;
     } catch (error) {
-      // Error handling is done inside the promise, but we catch here to prevent unhandled rejections
       logger.error('Error in shutdown promise', { error: error.message, stack: error.stack });
     }
   };

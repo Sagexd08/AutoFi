@@ -187,7 +187,6 @@ export class MonitoringSystem extends EventEmitter {
   }
 
   setupAlerts() {
-    // Set up alert conditions
     this.alertConditions = [
       {
         name: 'High CPU Usage',
@@ -238,7 +237,6 @@ export class MonitoringSystem extends EventEmitter {
       metrics: { ...this.metrics }
     };
     
-    // Check if this alert already exists and is unresolved
     const existingAlert = this.alerts.find(a => 
       a.name === condition.name && !a.resolved
     );
@@ -247,7 +245,6 @@ export class MonitoringSystem extends EventEmitter {
       this.alerts.push(alert);
       this.emit('alert', alert);
       
-      // Auto-resolve after 5 minutes
       setTimeout(() => {
         this.resolveAlert(alert.id);
       }, 5 * 60 * 1000);
@@ -263,7 +260,6 @@ export class MonitoringSystem extends EventEmitter {
     }
   }
 
-  // Blockchain-specific monitoring
   updateBlockchainMetrics(chainId, metrics) {
     this.metrics.blockchain[chainId] = {
       ...metrics,
@@ -295,7 +291,6 @@ export class MonitoringSystem extends EventEmitter {
     
     this.responseTimes.push(duration);
     
-    // Keep only last 100 response times
     if (this.responseTimes.length > 100) {
       this.responseTimes = this.responseTimes.slice(-100);
     }
@@ -307,7 +302,6 @@ export class MonitoringSystem extends EventEmitter {
     this.activeConnections = count;
   }
 
-  // Health check
   getHealthStatus() {
     const uptime = process.uptime();
     const memory = process.memoryUsage();
@@ -328,7 +322,6 @@ export class MonitoringSystem extends EventEmitter {
       timestamp: new Date().toISOString()
     };
     
-    // Determine overall health status
     if (health.alerts > 0) {
       const criticalAlerts = this.alerts.filter(a => !a.resolved && a.severity === 'critical');
       health.status = criticalAlerts.length > 0 ? 'critical' : 'warning';
@@ -341,7 +334,6 @@ export class MonitoringSystem extends EventEmitter {
     return health;
   }
 
-  // Get metrics for specific time range
   getMetrics(timeRange = '1h') {
     const now = Date.now();
     let startTime;
@@ -373,7 +365,6 @@ export class MonitoringSystem extends EventEmitter {
     };
   }
 
-  // Export metrics
   exportMetrics(format = 'json') {
     const data = {
       metrics: this.metrics,
@@ -394,11 +385,9 @@ export class MonitoringSystem extends EventEmitter {
   }
 
   exportToCSV(data) {
-    // Simple CSV export for metrics
     const headers = ['timestamp', 'cpu_usage', 'memory_usage', 'request_count', 'error_count'];
     const rows = [headers.join(',')];
     
-    // This would be more comprehensive in a real implementation
     rows.push([
       new Date().toISOString(),
       data.metrics.system.cpu?.usage || 0,
@@ -422,7 +411,6 @@ export class MonitoringSystem extends EventEmitter {
     };
   }
 
-  // Cleanup
   stop() {
     if (this.interval) {
       clearInterval(this.interval);

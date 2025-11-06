@@ -1,13 +1,9 @@
 import logger from '../utils/logger.js';
 import { getRequestId } from '../utils/request-id.js';
 
-/**
- * Request logging middleware
- */
 export function requestLoggerMiddleware(req, res, next) {
   const startTime = Date.now();
   
-  // Log request start
   logger.debug(`${req.method} ${req.path}`, {
     requestId: getRequestId(req),
     method: req.method,
@@ -16,7 +12,6 @@ export function requestLoggerMiddleware(req, res, next) {
     ip: req.ip,
   });
 
-  // Override res.json to log response
   const originalJson = res.json.bind(res);
   res.json = function(body) {
     const responseTime = Date.now() - startTime;

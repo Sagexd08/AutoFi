@@ -1,11 +1,6 @@
 import express from 'express';
 import { logger } from '../utils/logger.js';
 
-/**
- * Create health check routes with actual service verification
- * @param {Object} automationSystem - The automation system instance
- * @returns {express.Router} Express router with health endpoints
- */
 export function createHealthRoutes(automationSystem = null) {
   const router = express.Router();
 
@@ -32,11 +27,9 @@ export function createHealthRoutes(automationSystem = null) {
       },
     };
 
-    // Database health check
     const dbStartTime = Date.now();
     try {
       if (automationSystem?.db) {
-        // Execute a simple query to verify database connection
         const stmt = automationSystem.db.prepare('SELECT 1 as health_check');
         stmt.get();
         const responseTime = Date.now() - dbStartTime;
@@ -62,11 +55,9 @@ export function createHealthRoutes(automationSystem = null) {
       health.status = 'degraded';
     }
 
-    // Blockchain health check
     const blockchainStartTime = Date.now();
     try {
       if (automationSystem?.publicClient) {
-        // Make a simple RPC call to verify blockchain connection
         await automationSystem.publicClient.getBlockNumber();
         const responseTime = Date.now() - blockchainStartTime;
         
@@ -106,7 +97,6 @@ export function createHealthRoutes(automationSystem = null) {
 
     let isReady = true;
 
-    // Check database readiness
     try {
       if (automationSystem?.db) {
         const stmt = automationSystem.db.prepare('SELECT 1');
@@ -120,7 +110,6 @@ export function createHealthRoutes(automationSystem = null) {
       isReady = false;
     }
 
-    // Check blockchain readiness
     try {
       if (automationSystem?.publicClient) {
         await automationSystem.publicClient.getBlockNumber();
@@ -153,7 +142,6 @@ export function createHealthRoutes(automationSystem = null) {
   return router;
 }
 
-// Default export for backward compatibility
 const router = express.Router();
 router.get('/', (req, res) => {
   res.json({

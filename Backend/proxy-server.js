@@ -38,10 +38,8 @@ export class ProxyServer extends EventEmitter {
   }
 
   initializeMiddleware() {
-    // Security middleware
     this.app.use(helmet());
     
-    // CORS middleware
     if (this.config.enableCORS) {
       this.app.use(cors({
         origin: this.config.corsOrigins || '*',
@@ -49,7 +47,6 @@ export class ProxyServer extends EventEmitter {
       }));
     }
     
-    // Rate limiting
     if (this.config.enableRateLimit) {
       this.rateLimiter = rateLimit({
         windowMs: 15 * 60 * 1000, // 15 minutes
@@ -61,16 +58,13 @@ export class ProxyServer extends EventEmitter {
       this.app.use(this.rateLimiter);
     }
     
-    // Body parsing
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true }));
     
-    // Authentication middleware
     if (this.config.enableAuth) {
       this.app.use(this.authMiddleware.bind(this));
     }
     
-    // Request logging
     this.app.use((req, res, next) => {
       const startTime = Date.now();
       req.startTime = startTime;
@@ -92,7 +86,6 @@ export class ProxyServer extends EventEmitter {
   }
 
   initializeRoutes() {
-    // Health check endpoint
     this.app.get('/health', async (req, res) => {
       try {
         const health = await this.healthMonitor.getHealthStatus();
@@ -106,7 +99,6 @@ export class ProxyServer extends EventEmitter {
       }
     });
     
-    // Chain health endpoint
     this.app.get('/chains/health', async (req, res) => {
       try {
         const chainHealth = await this.multiChainConfig.checkAllChainsHealth();
@@ -122,19 +114,16 @@ export class ProxyServer extends EventEmitter {
       }
     });
     
-    // Load balancer status
     this.app.get('/loadbalancer/status', (req, res) => {
       const status = this.loadBalancer.getStatus();
       res.json(status);
     });
     
-    // Metrics endpoint
     this.app.get('/metrics', (req, res) => {
       const metrics = this.getMetrics();
       res.json(metrics);
     });
     
-    // Chain selection endpoint
     this.app.post('/chains/select', async (req, res) => {
       try {
         const { operation, preferences } = req.body;
@@ -151,12 +140,10 @@ export class ProxyServer extends EventEmitter {
       }
     });
     
-    // Proxy all other requests through load balancer
     this.app.use('*', this.proxyMiddleware.bind(this));
   }
 
   initializeLoadBalancer() {
-    // Add chain targets to load balancer
     const chains = this.multiChainConfig.getAllChains();
     chains.forEach(chain => {
       this.loadBalancer.addTarget(chain.id, {
@@ -170,7 +157,6 @@ export class ProxyServer extends EventEmitter {
       });
     });
     
-    // Set up circuit breakers for each target
     chains.forEach(chain => {
       this.circuitBreakers.set(chain.id, new CircuitBreaker({
         failureThreshold: 5,
@@ -181,7 +167,6 @@ export class ProxyServer extends EventEmitter {
   }
 
   calculateWeight(chain) {
-    // Calculate weight based on gas price multiplier and priority
     const gasScore = 1 / chain.gasPriceMultiplier;
     const priorityScore = 1 / chain.priority;
     return Math.round((gasScore + priorityScore) * 10);
@@ -189,10 +174,8 @@ export class ProxyServer extends EventEmitter {
 
   async proxyMiddleware(req, res, next) {
     try {
-      // Extract chain preference from headers or query
       const preferredChain = req.headers['x-chain-id'] || req.query.chain;
       
-      // Get target from load balancer
       const target = await this.loadBalancer.getTarget(preferredChain);
       
       if (!target) {
@@ -202,7 +185,6 @@ export class ProxyServer extends EventEmitter {
         });
       }
       
-      // Check circuit breaker
       const circuitBreaker = this.circuitBreakers.get(target.id);
       if (circuitBreaker && !circuitBreaker.canExecute()) {
         return res.status(503).json({ 
@@ -212,10 +194,8 @@ export class ProxyServer extends EventEmitter {
         });
       }
       
-      // Get best RPC URL for the target
       const rpcUrl = await this.multiChainConfig.getBestRpcUrl(target.id);
       
-      // Create proxy middleware for this target
       const proxy = createProxyMiddleware({
         target: rpcUrl,
         changeOrigin: true,
@@ -223,13 +203,11 @@ export class ProxyServer extends EventEmitter {
           '^/api': '' // Remove /api prefix if present
         },
         onProxyReq: (proxyReq, req, res) => {
-          // Add custom headers
           proxyReq.setHeader('X-Forwarded-For', req.ip);
           proxyReq.setHeader('X-Chain-Id', target.id);
           proxyReq.setHeader('X-Proxy-Timestamp', new Date().toISOString());
         },
         onProxyRes: (proxyRes, req, res) => {
-          // Add response headers
           proxyRes.headers['X-Target-Chain'] = target.id;
           proxyRes.headers['X-Proxy-Response-Time'] = Date.now() - req.startTime;
         },
@@ -246,7 +224,6 @@ export class ProxyServer extends EventEmitter {
         }
       });
       
-      // Execute proxy
       proxy(req, res, next);
       
     } catch (error) {
@@ -270,8 +247,6 @@ export class ProxyServer extends EventEmitter {
     }
     
     if (this.config.jwtSecret && authHeader) {
-      // JWT validation would go here
-      // For now, just check if header exists
       if (!authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ 
           error: 'Invalid authorization header',
@@ -295,12 +270,10 @@ export class ProxyServer extends EventEmitter {
           resolve();
         });
         
-        // Start health monitoring
         if (this.config.enableHealthCheck) {
           this.healthMonitor.start();
         }
         
-        // Start load balancer health checks
         this.startLoadBalancerHealthChecks();
         
       } catch (error) {
@@ -378,7 +351,6 @@ export class ProxyServer extends EventEmitter {
   }
 }
 
-// Load Balancer Class
 class LoadBalancer {
   constructor() {
     this.targets = new Map();
@@ -424,7 +396,6 @@ class LoadBalancer {
       return null;
     }
     
-    // Return preferred chain if available and healthy
     if (preferredChain) {
       const preferred = healthyTargets.find(t => t.id === preferredChain);
       if (preferred) {
@@ -433,7 +404,6 @@ class LoadBalancer {
       }
     }
     
-    // Use load balancing algorithm
     switch (this.algorithm) {
       case 'round-robin':
         return this.getRoundRobinTarget(healthyTargets);
@@ -500,7 +470,6 @@ class LoadBalancer {
   }
 }
 
-// Circuit Breaker Class
 class CircuitBreaker {
   constructor(config) {
     this.failureThreshold = config.failureThreshold;
@@ -565,7 +534,6 @@ class CircuitBreaker {
   }
 }
 
-// Health Monitor Class
 class HealthMonitor {
   constructor() {
     this.healthStatus = {
@@ -590,7 +558,6 @@ class HealthMonitor {
 
   async checkHealth() {
     try {
-      // Check various services
       const services = {
         proxy: true, // Proxy server is running
         loadBalancer: true, // Load balancer is operational
@@ -613,8 +580,6 @@ class HealthMonitor {
   }
 
   async checkChainsHealth() {
-    // This would check chain health
-    // For now, return true
     return true;
   }
 

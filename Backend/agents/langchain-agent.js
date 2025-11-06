@@ -7,7 +7,6 @@ import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 import logger from '../utils/logger.js';
 
-// Configure LangSmith with proper API key
 if (!process.env.LANGCHAIN_API_KEY && !process.env.LANGSMITH_API_KEY) {
   logger.warn('LangSmith API key not found in environment variables');
 }
@@ -67,7 +66,6 @@ export class LangChainAgent {
           tokenAddress: z.string().optional().describe("The token contract address (optional, defaults to CELO)")
         }),
         func: async ({ address, tokenAddress }) => {
-          // This would integrate with your blockchain interface
           return `Balance check for ${address} - Token: ${tokenAddress || 'CELO'}`;
         }
       }),
@@ -81,7 +79,6 @@ export class LangChainAgent {
           data: z.string().optional().describe("Transaction data (optional)")
         }),
         func: async ({ to, value, tokenAddress, data }) => {
-          // This would integrate with your transaction execution logic
           return `Transaction prepared: Send ${value} to ${to}`;
         }
       }),
@@ -92,7 +89,6 @@ export class LangChainAgent {
           tokenAddress: z.string().describe("The token contract address")
         }),
         func: async ({ tokenAddress }) => {
-          // This would fetch token metadata
           return `Token info for ${tokenAddress}`;
         }
       })
@@ -101,10 +97,8 @@ export class LangChainAgent {
 
   async processMessage(message, context = {}) {
     try {
-      // Add message to conversation history
       this.conversationHistory.push(new HumanMessage(message));
 
-      // Create prompt template
       const prompt = ChatPromptTemplate.fromMessages([
         new SystemMessage(`You are an AI agent specialized in Celo blockchain operations. 
         You can help users with wallet management, token operations, and transaction execution.
@@ -117,16 +111,13 @@ export class LangChainAgent {
         new HumanMessage("{input}")
       ]);
 
-      // Create chain
       const chain = prompt.pipe(this.llm);
 
-      // Invoke with tools
       const response = await chain.invoke({
         input: message,
         chat_history: this.conversationHistory.slice(-10) // Keep last 10 messages
       });
 
-      // Add response to history
       this.conversationHistory.push(new AIMessage(response.content));
 
       return {

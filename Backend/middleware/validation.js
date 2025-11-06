@@ -1,9 +1,6 @@
 import { z } from 'zod';
 import { ValidationError } from '../utils/errors.js';
 
-/**
- * Validation middleware factory
- */
 export function validate(schema) {
   return (req, res, next) => {
     try {
@@ -13,7 +10,6 @@ export function validate(schema) {
         params: req.params,
       });
       
-      // Attach validated data to request
       req.validated = validated;
       next();
     } catch (error) {
@@ -30,9 +26,6 @@ export function validate(schema) {
   };
 }
 
-/**
- * Common validation schemas
- */
 export const schemas = {
   address: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address format'),
   hexString: z.string().regex(/^0x[a-fA-F0-9]+$/, 'Invalid hex string format'),

@@ -73,7 +73,6 @@ export class CodeGenerator extends EventEmitter {
     if (!source || typeof source !== 'string') {
       return false;
     }
-    // Check if source is only comments (stub pattern)
     const nonCommentLines = source
       .split('\n')
       .map(line => line.trim())
@@ -88,7 +87,6 @@ export class CodeGenerator extends EventEmitter {
     if (!source || typeof source !== 'string') {
       throw new Error('Valid source code string is required');
     }
-    // Validate language support - check for stub sources or explicit language parameter
     if (language && language !== 'solidity') {
       throw new Error(`Language ${language} not supported`);
     }
@@ -146,7 +144,6 @@ export class CodeGenerator extends EventEmitter {
     if (!source || typeof source !== 'string') {
       throw new Error('Valid source code string is required for deployment');
     }
-    // Validate language support - check for stub sources or explicit language parameter
     if (language && language !== 'solidity') {
       throw new Error(`Language ${language} not supported`);
     }
@@ -231,7 +228,6 @@ export class CodeGenerator extends EventEmitter {
     if (language === 'solidity') {
       return this.generateSolidityTemplate(description, name, options);
     }
-    // Explicit error for unsupported languages
     throw new Error(`Language ${language} not supported`);
   }
   sanitizeContractName(name) {

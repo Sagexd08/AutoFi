@@ -19,9 +19,6 @@ import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages
 import { EventEmitter } from 'events';
 import logger from '../utils/logger.js';
 
-// ---------------------------------------------------------------------------
-// Embedded LangChainAgent
-// ---------------------------------------------------------------------------
 class LangChainAgent {
   constructor(config = {}) {
     this.config = {
@@ -137,7 +134,6 @@ class LangChainAgent {
   }
 }
 
-// expose LangChainAgent as a named export as well
 export { LangChainAgent };
 
 const DEFAULT_ADDRESS = '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEbb';
@@ -608,9 +604,6 @@ export class ConsolidatedAgentSystem extends EventEmitter {
     });
   }
 
-  // -----------------------------------------------------------------------
-  // Embedded LangChainAgent compatibility
-  // -----------------------------------------------------------------------
   async attachLangChainAgent() {
     if (!this.langChainAgent) {
       try {
@@ -619,7 +612,6 @@ export class ConsolidatedAgentSystem extends EventEmitter {
           openaiApiKey: this.automationSystem?.config?.openaiApiKey
         });
 
-        // Wire the blockchain interface so LangChain tools can call into the system
         if (this.automationSystem && this.automationSystem.blockchainInterface) {
           this.langChainAgent.updateToolsWithInterface(this.automationSystem.blockchainInterface);
         }

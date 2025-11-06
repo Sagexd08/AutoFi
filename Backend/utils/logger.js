@@ -1,8 +1,5 @@
 import config from '../config/env.js';
 
-/**
- * Log levels
- */
 const LOG_LEVELS = {
   error: 0,
   warn: 1,
@@ -13,36 +10,23 @@ const LOG_LEVELS = {
 
 const LEVEL_NAMES = Object.keys(LOG_LEVELS);
 
-/**
- * Get current log level (lazy evaluation to avoid circular dependency)
- */
 function getCurrentLevel() {
   try {
     return LOG_LEVELS[config.LOG_LEVEL] || LOG_LEVELS.info;
   } catch (error) {
-    // Fallback if config is not yet initialized
     return LOG_LEVELS.info;
   }
 }
 
-/**
- * Structured logger with request ID support
- */
 class Logger {
   constructor(context = 'App') {
     this.context = context;
   }
 
-  /**
-   * Create a child logger with a specific context
-   */
   child(context) {
     return new Logger(`${this.context}:${context}`);
   }
 
-  /**
-   * Format log entry
-   */
   format(level, message, meta = {}) {
     const timestamp = new Date().toISOString();
     const logEntry = {
@@ -57,7 +41,6 @@ class Logger {
       return JSON.stringify(logEntry);
     }
 
-    // Pretty print for development
     const colorCodes = {
       error: '\x1b[31m', // Red
       warn: '\x1b[33m',  // Yellow
@@ -71,9 +54,6 @@ class Logger {
     return `${color}[${timestamp}] ${level.toUpperCase()}${reset} [${this.context}] ${message}${Object.keys(meta).length ? ' ' + JSON.stringify(meta, null, 2) : ''}`;
   }
 
-  /**
-   * Log message if level is enabled
-   */
   log(level, message, meta = {}) {
     const currentLevel = getCurrentLevel();
     if (LOG_LEVELS[level] <= currentLevel) {
@@ -103,9 +83,6 @@ class Logger {
     this.log('verbose', message, meta);
   }
 
-  /**
-   * Log HTTP request
-   */
   request(req, res, responseTime) {
     if (!config.ENABLE_REQUEST_LOGGING) return;
 
@@ -124,16 +101,10 @@ class Logger {
   }
 }
 
-/**
- * Create logger instance
- */
 export function createLogger(context) {
   return new Logger(context);
 }
 
-/**
- * Default logger instance
- */
 export const logger = createLogger('App');
 
 export default logger;

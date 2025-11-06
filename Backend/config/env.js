@@ -3,50 +3,36 @@ import { z } from 'zod';
 
 dotenv.config();
 
-/**
- * Environment variable validation schema
- */
 const envSchema = z.object({
-  // Server Configuration
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.string().transform(Number).pipe(z.number().min(1).max(65535)).default('3000'),
   HOST: z.string().default('0.0.0.0'),
 
-  // API Keys
   GEMINI_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   POSTMAN_API_KEY: z.string().optional(),
   
-  // Blockchain Configuration
   PRIVATE_KEY: z.string().optional(),
   NETWORK: z.string().default('alfajores'),
   RPC_URL: z.string().url().optional(),
   
-  // Database Configuration
   DATABASE_URL: z.string().optional(),
   
-  // Rate Limiting
   RATE_LIMIT_WINDOW_MS: z.string().transform(Number).pipe(z.number().positive()).default('900000'), // 15 minutes
   RATE_LIMIT_MAX_REQUESTS: z.string().transform(Number).pipe(z.number().positive()).default('100'),
   
-  // Security
   JWT_SECRET: z.string().min(32).optional(),
   API_KEY: z.string().optional(),
   ALLOWED_ORIGINS: z.string().default('*'),
   
-  // Logging
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug', 'verbose']).default('info'),
   ENABLE_REQUEST_LOGGING: z.string().transform(v => v === 'true').default('true'),
   
-  // Features
   ENABLE_PROXY: z.string().transform(v => v === 'true').default('false'),
   ENABLE_MULTI_CHAIN: z.string().transform(v => v === 'true').default('true'),
   ENABLE_TESTING: z.string().transform(v => v === 'true').default('true'),
 });
 
-/**
- * Validated environment configuration
- */
 let env;
 
 try {
@@ -62,13 +48,9 @@ try {
   throw error;
 }
 
-/**
- * Configuration object with helper methods
- */
 export const config = {
   ...env,
   
-  // Helper getters
   get isDevelopment() {
     return env.NODE_ENV === 'development';
   },

@@ -60,18 +60,15 @@ async function loadConfig() {
 
 async function compileSolidity(sourceCode, contractName) {
   try {
-    // Try to import solc dynamically
     const solc = await import('solc').catch(() => {
       throw new Error('solc package not found. Please install it: npm install solc');
     });
     
     const solcModule = solc.default || solc;
     
-    // Try to detect Solidity version from pragma statement
     let compilerVersion = '0.8.20'; // Default version
     const pragmaMatch = sourceCode.match(/pragma\s+solidity\s+([\^>=<]?\d+\.\d+\.\d+)/);
     if (pragmaMatch) {
-      // Extract version, handle version ranges
       const versionStr = pragmaMatch[1].replace(/[\^>=<]/g, '');
       const versionParts = versionStr.split('.');
       if (versionParts.length >= 2) {
@@ -79,25 +76,20 @@ async function compileSolidity(sourceCode, contractName) {
       }
     }
     
-    // Load the compiler version - handle different solc-js API versions
     let compiler;
     try {
-      // Try newer API first (solc-js >= 0.8.0)
       if (typeof solcModule.setupMethods === 'object' && solcModule.setupMethods.solidity) {
         compiler = await solcModule.setupMethods.solidity.loadRemoteVersion(compilerVersion);
       } 
-      // Try older API (solc-js < 0.8.0)
       else if (typeof solcModule.loadRemoteVersion === 'function') {
         compiler = await solcModule.loadRemoteVersion(compilerVersion);
       }
-      // Fallback to default compiler if available
       else if (typeof solcModule.compile === 'function') {
         compiler = solcModule;
       } else {
         throw new Error('Unable to initialize Solidity compiler. Please ensure solc is properly installed.');
       }
     } catch (loadError) {
-      // If remote loading fails, try to use the default compiler
       if (typeof solcModule.compile === 'function') {
         compiler = solcModule;
       } else {
@@ -105,7 +97,6 @@ async function compileSolidity(sourceCode, contractName) {
       }
     }
     
-    // Extract contract name from source if not provided
     let actualContractName = contractName;
     if (!actualContractName) {
       const contractMatch = sourceCode.match(/contract\s+(\w+)/);
@@ -116,7 +107,6 @@ async function compileSolidity(sourceCode, contractName) {
       }
     }
     
-    // Prepare input for solc compiler (standard JSON input format)
     const input = {
       language: 'Solidity',
       sources: {
@@ -137,7 +127,6 @@ async function compileSolidity(sourceCode, contractName) {
       },
     };
     
-    // Compile the contract
     const inputJSON = JSON.stringify(input);
     let compileOutput;
     
@@ -149,7 +138,6 @@ async function compileSolidity(sourceCode, contractName) {
     
     const output = typeof compileOutput === 'string' ? JSON.parse(compileOutput) : compileOutput;
     
-    // Check for compilation errors
     if (output.errors && Array.isArray(output.errors)) {
       const errors = output.errors.filter(
         (error) => error.severity === 'error'
@@ -164,7 +152,6 @@ async function compileSolidity(sourceCode, contractName) {
       }
     }
     
-    // Extract ABI and bytecode
     const contracts = output.contracts?.['contract.sol'];
     if (!contracts) {
       throw new Error('No contracts found in compilation output. Check for compilation errors.');
@@ -217,15 +204,12 @@ program
         logLevel: 'info',
       };
 
-      // Write config file with restrictive permissions (0o600 = owner read/write only)
       const configContent = JSON.stringify(config, null, 2);
       
-      // Create file with restrictive permissions using fs.open with mode 0o600
       let fileHandle;
       try {
         fileHandle = await fs.open(configPath, 'wx', 0o600); // 'wx' = write exclusive, fails if exists
       } catch (openError) {
-        // If file exists, try opening with 'w' mode
         if (openError.code === 'EEXIST') {
           fileHandle = await fs.open(configPath, 'w', 0o600);
         } else {
@@ -234,7 +218,6 @@ program
       }
       
       try {
-        // Write content to file using fileHandle.write
         const buffer = Buffer.from(configContent, 'utf-8');
         await fileHandle.write(buffer, 0, buffer.length);
       } catch (writeError) {
@@ -245,7 +228,6 @@ program
         await fileHandle.close();
       }
       
-      // Ensure permissions are set correctly (important for some systems)
       try {
         await fs.chmod(configPath, 0o600);
       } catch (chmodError) {
@@ -258,13 +240,11 @@ program
 
       console.log('✅ Configuration file created at:', configPath);
       
-      // Security warning
       console.log('\n⚠️  SECURITY WARNING:');
       console.log('   This file contains sensitive private keys and API credentials.');
       console.log('   Keep this file secure and never commit it to version control.');
       console.log('   File permissions have been set to owner read/write only (600).');
 
-      // Ensure .gitignore includes the config file
       const gitignorePath = path.join(process.cwd(), '.gitignore');
       const configFileName = '.celo-ai.config.json';
       
@@ -273,10 +253,8 @@ program
         try {
           gitignoreContent = await fs.readFile(gitignorePath, 'utf-8');
         } catch {
-          // .gitignore doesn't exist, we'll create it
         }
 
-        // Check if config file is already in .gitignore
         const ignorePatterns = gitignoreContent.split('\n').map(line => line.trim());
         const isIgnored = ignorePatterns.some(pattern => {
           if (!pattern || pattern.startsWith('#')) return false;
@@ -286,7 +264,6 @@ program
         });
 
         if (!isIgnored) {
-          // Add to .gitignore
           const separator = gitignoreContent && !gitignoreContent.endsWith('\n') ? '\n' : '';
           const newEntry = `${separator}# Celo AI SDK configuration (contains sensitive keys)\n${configFileName}\n`;
           await fs.appendFile(gitignorePath, newEntry);
@@ -465,7 +442,6 @@ txCmd
   .option('-c, --chain <chain>', 'Chain ID')
   .action(async (options) => {
     try {
-      // Validate recipient address
       const addressPattern = /^0x[a-fA-F0-9]{40}$/;
       if (!addressPattern.test(options.to)) {
         console.error('❌ Invalid recipient address format.');
@@ -474,7 +450,6 @@ txCmd
         process.exit(1);
       }
 
-      // Validate value if provided
       if (options.value !== undefined && options.value !== null) {
         const valueStr = String(options.value).trim();
         if (valueStr === '' || isNaN(valueStr)) {
@@ -484,7 +459,6 @@ txCmd
           process.exit(1);
         }
 
-        // Check if it can be safely parsed to BigInt (for wei values)
         try {
           BigInt(valueStr);
         } catch (bigIntError) {
@@ -495,7 +469,6 @@ txCmd
           process.exit(1);
         }
 
-        // Also check if it can be parsed as a number (for additional validation)
         const numValue = Number(valueStr);
         if (!Number.isFinite(numValue) || numValue < 0) {
           console.error('❌ Invalid value format.');
@@ -505,7 +478,6 @@ txCmd
         }
       }
 
-      // Display transaction details for confirmation
       console.log('\n📋 Transaction Details:');
       console.log(`   To: ${options.to}`);
       if (options.value !== undefined && options.value !== null) {
@@ -520,14 +492,12 @@ txCmd
         console.log(`   Chain: (default)`);
       }
 
-      // Interactive confirmation prompt
       const rl = readline.createInterface({ input, output });
       try {
         await rl.question('\n⚠️  Press Enter to confirm and send the transaction (Ctrl+C to cancel): ');
         rl.close();
       } catch (promptError) {
         rl.close();
-        // If user presses Ctrl+C, readline throws an error
         if (promptError.code === 'SIGINT' || promptError.name === 'AbortError') {
           console.log('\n\n❌ Transaction cancelled by user.');
           process.exit(1);
@@ -580,7 +550,6 @@ contractCmd
   .option('-c, --chain <chain>', 'Chain ID')
   .action(async (options) => {
     try {
-      // Read and validate source file
       let source;
       try {
         source = await fs.readFile(options.source, 'utf-8');
@@ -597,7 +566,6 @@ contractCmd
         process.exit(1);
       }
 
-      // Compile the contract
       console.log('\n🔨 Compiling contract...');
       let abi, bytecode;
       try {

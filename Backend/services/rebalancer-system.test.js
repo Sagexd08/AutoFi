@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import RebalancerSystem from './rebalancer-system.js';
 import logger from '../utils/logger.js';
 
-// Mock logger
 vi.mock('../utils/logger.js', () => ({
   default: {
     warn: vi.fn(),
@@ -17,10 +16,8 @@ describe('RebalancerSystem - Transaction Amount Validation', () => {
   let mockAutomationSystem;
 
   beforeEach(() => {
-    // Reset mocks
     vi.clearAllMocks();
     
-    // Create mock automation system
     mockAutomationSystem = {
       processNaturalLanguage: vi.fn().mockResolvedValue({
         result: {
@@ -47,7 +44,6 @@ describe('RebalancerSystem - Transaction Amount Validation', () => {
       const walletAddress = '0x1234567890123456789012345678901234567890';
       const targetAllocation = { CELO: 0.5, cUSD: 0.3, cEUR: 0.2 };
 
-      // Mock calculateRebalancingTransactions to return transaction with undefined amount
       const originalCalculate = rebalancerSystem.calculateRebalancingTransactions.bind(rebalancerSystem);
       rebalancerSystem.calculateRebalancingTransactions = vi.fn().mockReturnValue({
         transactions: [
@@ -55,7 +51,7 @@ describe('RebalancerSystem - Transaction Amount Validation', () => {
             type: 'swap',
             from: 'CELO',
             to: 'cUSD',
-            amount: undefined, // Missing amount
+            amount: undefined,
             estimatedGas: 0.001
           }
         ],
@@ -68,7 +64,6 @@ describe('RebalancerSystem - Transaction Amount Validation', () => {
         execute: false
       });
 
-      // Check that warning was logged
       expect(logger.warn).toHaveBeenCalledWith(
         'Transaction amount validation failed - skipping cost calculations',
         expect.objectContaining({
@@ -78,7 +73,6 @@ describe('RebalancerSystem - Transaction Amount Validation', () => {
         })
       );
 
-      // Check that missing component was recorded
       expect(result.plan.costBreakdown.missingComponents).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -90,7 +84,6 @@ describe('RebalancerSystem - Transaction Amount Validation', () => {
         ])
       );
 
-      // Check that cost calculations were skipped (should be 0 or only gas if available)
       expect(result.plan.estimatedCost).toBeDefined();
     });
 
@@ -316,17 +309,11 @@ describe('RebalancerSystem - Transaction Amount Validation', () => {
         execute: false
       });
 
-      // Should not log warning for valid amount
       expect(logger.warn).not.toHaveBeenCalledWith(
         'Transaction amount validation failed - skipping cost calculations',
         expect.anything()
       );
 
-      // Should calculate costs using the validated amount
-      // Protocol fee should be: 100.5 * 0.003 = 0.3015
-      // LP fee should be: 100.5 * 0.003 = 0.3015
-      // Slippage should be: 100.5 * 0.01 = 1.005
-      // Gas cost should be: 0.00001 * 0.001 = 0.00000001
       expect(result.plan.estimatedCost).toBeGreaterThan(0);
       expect(result.plan.costBreakdown.protocolFees).toBeCloseTo(100.5 * 0.003, 5);
       expect(result.plan.costBreakdown.liquidityProviderFees).toBeCloseTo(100.5 * 0.003, 5);
@@ -372,7 +359,6 @@ describe('RebalancerSystem - Transaction Amount Validation', () => {
         execute: false
       });
 
-      // Should log warning for the invalid transaction
       expect(logger.warn).toHaveBeenCalledWith(
         'Transaction amount validation failed - skipping cost calculations',
         expect.objectContaining({
@@ -381,13 +367,11 @@ describe('RebalancerSystem - Transaction Amount Validation', () => {
         })
       );
 
-      // Should have missing component for invalid transaction
       const missingAmountEntry = result.plan.costBreakdown.missingComponents.find(
         entry => entry.transaction === 'cUSD -> cEUR' && entry.missing.includes('amount')
       );
       expect(missingAmountEntry).toBeDefined();
 
-      // Should still calculate costs for valid transactions
       expect(result.plan.estimatedCost).toBeGreaterThan(0);
     });
 
@@ -448,7 +432,6 @@ describe('RebalancerSystem - Transaction Amount Validation', () => {
         execute: false
       });
 
-      // parseFloat('  100  ') = 100, which is valid
       expect(logger.warn).not.toHaveBeenCalledWith(
         'Transaction amount validation failed - skipping cost calculations',
         expect.anything()

@@ -131,7 +131,6 @@ export function createApiRoutes(automationSystem = null) {
     const { address } = req.params;
     const { abi, abiUrl, chainId = DEFAULT_CHAIN_ID } = req.query;
     
-    // Coerce boolean query parameters explicitly (query params are strings, so 'false' is truthy)
     const includeBytecodeFlag = req.query.includeBytecode !== undefined 
       ? (String(req.query.includeBytecode).toLowerCase() === 'true' || req.query.includeBytecode === '1')
       : false;
@@ -151,13 +150,11 @@ export function createApiRoutes(automationSystem = null) {
     let parsedAbi;
     try {
       if (abiUrl) {
-        // Validate URL scheme and prevent internal network access
         const url = new URL(abiUrl);
         if (!['http:', 'https:'].includes(url.protocol)) {
           throw new Error('Only HTTP and HTTPS protocols are allowed');
         }
         
-        // Block common internal network ranges
         const hostname = url.hostname.toLowerCase();
         if (
           hostname === 'localhost' ||
