@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import type { Middleware, MiddlewareContext } from './types';
 
 export interface RateLimitConfig {

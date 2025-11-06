@@ -3,9 +3,11 @@
     "target": "ES2022",
     "module": "ESNext",
     "lib": ["ES2022"],
+    "types": ["node"],
+    "typeRoots": ["../../node_modules/@types"],
     "outDir": "./dist",
     "rootDir": "./src",
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -35,8 +37,7 @@
       "@/agents/*": ["./agents/*"]
     },
     "incremental": true,
-    "composite": true,
-    "types": []
+    "composite": true
   },
   "include": [
     "src/**/*"
