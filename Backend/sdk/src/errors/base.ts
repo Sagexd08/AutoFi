@@ -72,4 +72,5 @@ export class SDKError extends Error {
       message += ` | Caused by: ${this.cause.message}`;
     }
     return message;
-  }}
+  }
+}

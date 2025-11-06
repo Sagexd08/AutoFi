@@ -35,14 +35,11 @@ export function createRetryMiddleware(config: RetryMiddlewareConfig): Middleware
         console.error('[RetryMiddleware] Error in shouldRetry callback', {
           requestId: context.request.id,
           path: context.request.path,
+          method: context.request.method,
           error: error instanceof Error ? error.message : String(error),
-          context: {
-            request: context.request,
-            response: context.response,
-            error: context.error,
-          },
-        });
-        // Default to true to allow retries on error (safe default)
+          errorType: context.error?.constructor?.name,
+          statusCode: context.response?.statusCode,
+        });        // Default to true to allow retries on error (safe default)
         shouldRetryResult = true;
       }
 

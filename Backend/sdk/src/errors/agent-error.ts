@@ -41,8 +41,7 @@ export class AgentError extends SDKError {
       },
       recoverable: options.recoverable ?? true,
       cause: options.cause,
-    });    });
-    this.agentId = options.agentId;
+    });    this.agentId = options.agentId;
     this.agentType = options.agentType;
     this.operation = options.operation;
   }

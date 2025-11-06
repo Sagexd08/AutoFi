@@ -153,12 +153,11 @@ export function createTools(celoClient?: CeloClient) {
         txHash: z.string().describe('The transaction hash'),
       }),
       func: async ({ txHash }) => {
-        const status = await getTransactionStatus(celoClient, txHash as Address);
+        const status = await getTransactionStatus(celoClient, txHash as `0x${string}`);
         return JSON.stringify({
           success: true,
           ...status,
         });
       },
     }),
-  ];
-}
+  ];}

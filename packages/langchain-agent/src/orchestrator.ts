@@ -120,7 +120,12 @@ export class WorkflowOrchestrator {
     try {
       for (const action of workflow.actions) {
         const result = await this.executeAction(action);
-        results[action.type] = result;
+        
+        // Store results in arrays per action type to preserve all results
+        if (!results[action.type]) {
+          results[action.type] = [];
+        }
+        results[action.type].push(result);
 
         if (result.transactionHash) {
           transactionHashes.push(result.transactionHash);
@@ -201,13 +206,21 @@ export class WorkflowOrchestrator {
 
     switch (action.type) {
       case 'transfer': {
+        // Validate required fields
+        if (!action.to) {
+          return { success: false, error: 'Missing required transfer parameter: to' };
+        }
+        if (!action.amount) {
+          return { success: false, error: 'Missing required transfer parameter: amount' };
+        }
+
         if (action.tokenAddress) {
           const tool = tools.find((t) => t.name === 'send_token');
           if (tool) {
             const resultStr = await tool.func({
               tokenAddress: action.tokenAddress,
-              to: action.to!,
-              amount: action.amount!,
+              to: action.to,
+              amount: action.amount,
             } as any);
             const result = typeof resultStr === 'string' ? JSON.parse(resultStr) : resultStr;
             return {
@@ -221,8 +234,8 @@ export class WorkflowOrchestrator {
           const tool = tools.find((t) => t.name === 'send_celo');
           if (tool) {
             const resultStr = await tool.func({
-              to: action.to!,
-              amount: action.amount!,
+              to: action.to,
+              amount: action.amount,
             } as any);
             const result = typeof resultStr === 'string' ? JSON.parse(resultStr) : resultStr;
             return {
@@ -237,11 +250,19 @@ export class WorkflowOrchestrator {
       }
 
       case 'contract_call': {
+        // Validate required fields
+        if (!action.contractAddress) {
+          return { success: false, error: 'Missing required contract_call parameter: contractAddress' };
+        }
+        if (!action.functionName) {
+          return { success: false, error: 'Missing required contract_call parameter: functionName' };
+        }
+
         const tool = tools.find((t) => t.name === 'call_contract');
         if (tool) {
           const resultStr = await tool.func({
-            address: action.contractAddress!,
-            functionName: action.functionName!,
+            address: action.contractAddress,
+            functionName: action.functionName,
             parameters: action.parameters || [],
             abi: action.abi,
           } as any);

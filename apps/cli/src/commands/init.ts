@@ -1,6 +1,6 @@
 import inquirer from 'inquirer';
 import chalk from 'chalk';
-import { writeFileSync, existsSync, readFileSync } from 'fs';
+import { writeFileSync, existsSync, readFileSync, chmodSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
@@ -50,13 +50,26 @@ export async function initCommand() {
     createdAt: new Date().toISOString(),
   };
 
-  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
-  console.log(chalk.green(`\n✅ Configuration saved to ${CONFIG_FILE}`));
-}
+  try {
+    writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+    chmodSync(CONFIG_FILE, 0o600); // Owner read/write only
+    console.log(chalk.green(`\n✅ Configuration saved to ${CONFIG_FILE}`));
+    console.log(chalk.yellow('⚠️  Configuration contains sensitive data. Keep it secure.'));
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(chalk.red(`\n❌ Failed to save configuration: ${errorMessage}`));
+    process.exit(1);
+  }}
 
 export function getConfig() {
   if (!existsSync(CONFIG_FILE)) {
     return null;
   }
-  return JSON.parse(readFileSync(CONFIG_FILE, 'utf-8'));
+  try {
+    return JSON.parse(readFileSync(CONFIG_FILE, 'utf-8'));
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(chalk.red(`\n❌ Failed to read or parse configuration file ${CONFIG_FILE}: ${errorMessage}`));
+    return null;
+  }
 }

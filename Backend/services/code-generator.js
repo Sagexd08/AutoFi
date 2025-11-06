@@ -202,7 +202,12 @@ export class CodeGenerator extends EventEmitter {
     if (language === 'solidity') {
       return this.generateSolidityTemplate(description, name, options);
     }
-    return `
+    // Fallback stub for non-Solidity languages
+    return `// Contract: ${name}
+// Language: ${language}
+// Description: ${description}
+// This is a stub template. Full implementation for ${language} is not yet available.
+`;
   }
   sanitizeContractName(name) {
     if (!name || typeof name !== 'string') {
@@ -258,4 +263,4 @@ contract ${contractName} {
     };
   }
 }
-export default CodeGenerator;
+export default CodeGenerator;

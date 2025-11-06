@@ -1,20 +1,30 @@
 import { z } from 'zod';
 
-export const WorkflowTriggerSchema = z.object({
-  type: z.enum(['event', 'cron', 'manual', 'condition']),
-  event: z.object({
-    contractAddress: z.string(),
-    eventName: z.string(),
-    filter: z.record(z.any()).optional(),
-  }).optional(),
-  cron: z.string().optional(),
-  condition: z.object({
-    type: z.enum(['balance', 'price', 'custom']),
-    operator: z.enum(['gt', 'gte', 'lt', 'lte', 'eq']),
-    value: z.union([z.string(), z.number()]),
-  }).optional(),
-});
-
+export const WorkflowTriggerSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('event'),
+    event: z.object({
+      contractAddress: z.string(),
+      eventName: z.string(),
+      filter: z.record(z.any()).optional(),
+    }),
+  }),
+  z.object({
+    type: z.literal('cron'),
+    cron: z.string(),
+  }),
+  z.object({
+    type: z.literal('manual'),
+  }),
+  z.object({
+    type: z.literal('condition'),
+    condition: z.object({
+      type: z.enum(['balance', 'price', 'custom']),
+      operator: z.enum(['gt', 'gte', 'lt', 'lte', 'eq']),
+      value: z.union([z.string(), z.number()]),
+    }),
+  }),
+]);
 export const WorkflowActionSchema: z.ZodType<any> = z.object({
   type: z.enum([
     'transfer',

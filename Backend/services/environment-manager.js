@@ -187,15 +187,15 @@ export class EnvironmentManager extends EventEmitter {
     if (!request || typeof request !== 'object') {
       throw new Error('Invalid request object');
     }
-    this.stats.totalRequests++;
     const { type, target, parameters = {} } = request;
-    if (!type || typeof type !== 'string') {
-      throw new Error('Request type is required');
-    }
-    if (!target || typeof target !== 'string') {
-      throw new Error('Request target is required');
-    }
     try {
+      this.stats.totalRequests++;
+      if (!type || typeof type !== 'string') {
+        throw new Error('Request type is required');
+      }
+      if (!target || typeof target !== 'string') {
+        throw new Error('Request target is required');
+      }
       if (type === 'tool') {
         return await this.executeTool(target, parameters);
       } else if (type === 'sdk') {
@@ -235,7 +235,7 @@ export class EnvironmentManager extends EventEmitter {
   }
   registerSDKMethodsAsTools() {
     if (!this.autofiSDK) {
-      logger.warn('Cannot register SDK tools: AutoFi SDK not available');
+      console.warn('⚠️  Cannot register SDK tools: AutoFi SDK not available');
       return;
     }
     try {
@@ -264,6 +264,9 @@ export class EnvironmentManager extends EventEmitter {
         description: 'Get token balance for an address',
         category: 'sdk',
         handler: async (params) => {
+          if (!params.address || !params.tokenAddress) {
+            throw new Error('Missing required parameters: address and tokenAddress');
+          }
           return await this.autofiSDK.getTokenBalance(params.address, params.tokenAddress);
         }
       },
@@ -317,11 +320,11 @@ export class EnvironmentManager extends EventEmitter {
         try {
           this.registerTool(method);
         } catch (error) {
-          logger.error(`Failed to register SDK tool ${method.id}`, { error: error.message });
+          console.error(`❌ Failed to register SDK tool ${method.id}:`, error.message);
         }
       });
     } catch (error) {
-      logger.error('Failed to register SDK methods as tools', { error: error.message });
+      console.error('❌ Failed to register SDK methods as tools:', error);
     }
   }
   getStats() {

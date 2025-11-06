@@ -92,7 +92,9 @@ export class CombinedAutomationSystem extends EventEmitter {
     this.initializeEnhancedFeatures().catch((error) => {
       logger.error('Failed to initialize enhanced features', { error: error.message });
     });
-    this.initializeExpress();
+    this.initializeExpress().catch((error) => {
+      logger.error('Failed to initialize Express', { error: error.message });
+    });
   }
 
   mergeConfig(config) {
@@ -1197,7 +1199,7 @@ Guidelines:
     }
   }
 
-  initializeExpress() {
+  async initializeExpress() {
     this.app = express();
     this.setupMiddleware();
     this.setupRoutes();
@@ -1206,7 +1208,7 @@ Guidelines:
     this.setupMCPEndpoints();
     this.setupOrchestrationEndpoints();
     this.setupAnalyticsEndpoints();
-    this.setupErrorHandlers();
+    await this.setupErrorHandlers();
   }
 
   async initializeEnhancedFeatures() {
@@ -1394,21 +1396,6 @@ Guidelines:
 
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true }));
-    
-    import('../middleware/error-handler.js').then(({ errorHandler }) => {
-      this.app.use(errorHandler);
-    }).catch(() => {
-      this.app.use((err, req, res, next) => {
-        res.status(err.status || 500).json({
-          success: false,
-          error: {
-            message: err.message || 'Internal Server Error',
-            code: err.code || 'INTERNAL_ERROR',
-            timestamp: new Date().toISOString(),
-          },
-        });
-      });
-    });
   }
 
   setupRoutes() {
@@ -1852,19 +1839,27 @@ Guidelines:
     };
   }
 
-  setupErrorHandlers() {
-    this.app.use((err, req, res, next) => {
-      res.status(err.status || 500).json({
-        success: false,
-        error: {
-          message: err.message || 'Internal Server Error',
-          code: err.code || 'INTERNAL_ERROR',
-          timestamp: new Date().toISOString(),
-          requestId: req.headers['x-request-id'] || 'unknown'
-        }
+  async setupErrorHandlers() {
+    // Error handling middleware (if available)
+    try {
+      const { errorHandler } = await import('../middleware/error-handler.js');
+      this.app.use(errorHandler);
+    } catch {
+      // Fallback error handler
+      this.app.use((err, req, res, next) => {
+        res.status(err.status || 500).json({
+          success: false,
+          error: {
+            message: err.message || 'Internal Server Error',
+            code: err.code || 'INTERNAL_ERROR',
+            timestamp: new Date().toISOString(),
+            requestId: req.headers['x-request-id'] || 'unknown'
+          },
+        });
       });
-    });
+    }
 
+    // 404 handler must come after error handler
     this.app.use('*', (req, res) => {
       res.status(404).json({
         success: false,

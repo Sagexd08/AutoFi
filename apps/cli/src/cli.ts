@@ -91,7 +91,7 @@ program
 program
   .command('config')
   .description('Manage configuration')
-  .option('-s, --set <key> <value>', 'Set a configuration value')
+  .option('-s, --set <items...>', 'Set a configuration value (key and value)')
   .option('-g, --get <key>', 'Get a configuration value')
   .option('-l, --list', 'List all configuration')
   .action(async (options) => {

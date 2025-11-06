@@ -172,6 +172,7 @@ export function createRateLimitMiddleware(config: RateLimitConfig): RateLimitMid
 
       // Acquire lock for this key to serialize access
       const releaseLock = await acquireLock(key);
+      let lockHeld = true;
 
       try {
         // Atomically get or create entry while holding the lock
@@ -197,6 +198,7 @@ export function createRateLimitMiddleware(config: RateLimitConfig): RateLimitMid
 
         // Release lock before awaiting next middleware
         releaseLock();
+        lockHeld = false;
 
         await next();
 
@@ -211,8 +213,11 @@ export function createRateLimitMiddleware(config: RateLimitConfig): RateLimitMid
           };
         }
       } catch (error) {
-        // Always release lock, even if an error occurs
-        releaseLock();
+        // Release lock only if still held (prevents double-release)
+        if (lockHeld) {
+          releaseLock();
+          lockHeld = false;
+        }
         throw error;
       }
     },

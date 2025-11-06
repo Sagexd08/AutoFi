@@ -39,9 +39,8 @@
   },
   "engines": {
     "node": ">=18.0.0",
-    "pnpm": ">=8.0.0"
-  },
-  "repository": {
+    "pnpm": ">=10.0.0"
+  },  "repository": {
     "type": "git",
     "url": "https://github.com/celo-ai-agents/celo-automator"
   },

@@ -39,16 +39,17 @@ export class BufferMemory {
       this.recentActions = this.recentActions.slice(-20);
     }
   }
-
-  getChatHistory(): Array<HumanMessage | AIMessage> {
+  getChatHistory(): Array<HumanMessage | AIMessage | SystemMessage> {
     return this.chatHistory.map((msg) => {
       if (msg.role === 'user') {
         return new HumanMessage(msg.content);
+      } else if (msg.role === 'system') {
+        return new SystemMessage(msg.content);
       } else {
         return new AIMessage(msg.content);
       }
     });
-  }
+  }  }
 
   getRecentActions() {
     return this.recentActions;

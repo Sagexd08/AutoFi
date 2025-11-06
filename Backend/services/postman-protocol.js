@@ -31,6 +31,8 @@ export class PostmanProtocol extends EventEmitter {
     });
     this.client.interceptors.request.use(
       (config) => {
+        config.metadata = config.metadata || {};
+        config.metadata.startTime = Date.now();
         this.emit('request', { method: config.method, url: config.url });
         return config;
       },
@@ -41,19 +43,26 @@ export class PostmanProtocol extends EventEmitter {
     );
     this.client.interceptors.response.use(
       (response) => {
+        const duration = response.config?.metadata?.startTime 
+          ? Date.now() - response.config.metadata.startTime 
+          : undefined;
         this.emit('response', { 
           status: response.status, 
           url: response.config.url,
-          duration: response.duration 
+          duration
         });
         return response;
       },
       (error) => {
+        const duration = error.config?.metadata?.startTime 
+          ? Date.now() - error.config.metadata.startTime 
+          : undefined;
         this.emit('error', { 
           type: 'response', 
           error: error.message,
           status: error.response?.status,
-          url: error.config?.url
+          url: error.config?.url,
+          duration
         });
         return Promise.reject(error);
       }
@@ -179,8 +188,8 @@ export class PostmanProtocol extends EventEmitter {
     }
   }
   async executeRequest(requestData, environment = null) {
+    const startTime = Date.now();
     try {
-      const startTime = Date.now();
       const config = {
         method: requestData.method || 'GET',
         url: requestData.url,
@@ -290,9 +299,14 @@ export class PostmanProtocol extends EventEmitter {
         folder: item.name,
         results: folderResults
       };
+    } else {
+      return {
+        success: false,
+        error: 'Invalid item: no request or folder found',
+        item: item.name || 'Unknown'
+      };
     }
-  }
-  findItemById(items, testId) {
+  }  findItemById(items, testId) {
     for (const item of items) {
       if (item.id === testId || item.name === testId || item.uid === testId) {
         return item;
@@ -392,7 +406,9 @@ export class PostmanProtocol extends EventEmitter {
       const run = response.data.run;
       this.emit('monitorRunCompleted', { monitorId, runId: run.uid });
       return run;
-    } catch (error) {
+  replaceVariablesInObject(obj, variable) {
+    if (typeof obj === 'string') {
+      const escapedKey = variable.key.replace(/[.*+?^${}()|[\]\\]/g, '\\    } catch (error) {
       this.emit('error', { type: 'runMonitor', error: error.message });
       throw new Error(`Failed to run monitor ${monitorId}: ${error.message}`);
     }
@@ -404,7 +420,17 @@ export class PostmanProtocol extends EventEmitter {
       const newObj = Array.isArray(obj) ? [] : {};
       for (const key in obj) {
         newObj[key] = this.replaceVariablesInObject(obj[key], variable);
+');
+      return obj.replace(new RegExp(`{{${escapedKey}}}`, 'g'), variable.value);
+    } else if (typeof obj === 'object' && obj !== null) {
+      const newObj = Array.isArray(obj) ? [] : {};
+      for (const key in obj) {
+        newObj[key] = this.replaceVariablesInObject(obj[key], variable);
       }
+      return newObj;
+    }
+    return obj;
+  }      }
       return newObj;
     }
     return obj;

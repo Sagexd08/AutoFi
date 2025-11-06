@@ -14,7 +14,12 @@ export async function workflowCommand(options: any) {
   } else if (options.list) {
     await listWorkflows(apiUrl);
   } else if (options.execute) {
-    await executeWorkflow(apiUrl, options.execute);
+    try {
+      const success = await executeWorkflow(apiUrl, options.execute);
+      process.exit(success ? 0 : 1);
+    } catch (error) {
+      process.exit(1);
+    }
   } else if (options.describe) {
     await describeWorkflow(apiUrl, options.describe);
   } else {
@@ -44,7 +49,14 @@ export async function workflowCommand(options: any) {
         const { id } = await inquirer.prompt([
           { type: 'input', name: 'id', message: 'Workflow ID:' },
         ]);
-        await executeWorkflow(apiUrl, id);
+        try {
+          const success = await executeWorkflow(apiUrl, id);
+          if (!success) {
+            process.exit(1);
+          }
+        } catch (error) {
+          process.exit(1);
+        }
         break;
       case 'describe':
         const { descId } = await inquirer.prompt([
@@ -118,34 +130,107 @@ async function listWorkflows(apiUrl: string) {
   }
 }
 
-async function executeWorkflow(apiUrl: string, workflowId: string) {
+async function executeWorkflow(
+  apiUrl: string,
+  workflowId: string,
+  timeoutMs: number = 300000, // 5 minutes default
+  maxRetries: number = 5,
+  pollIntervalMs: number = 2000 // Fixed interval for normal polling
+) {
+  const startTime = Date.now();
+  let lastKnownExecution: any = null;
+  let consecutiveRetries = 0;
+  let retryBackoffMs = pollIntervalMs; // Start with poll interval, will double on retries
+  const maxBackoffMs = 30000; // 30 seconds max backoff
+
   try {
     const response = await axios.post(`${apiUrl}/api/workflows/${workflowId}/execute`);
     const execution = response.data.execution;
+    lastKnownExecution = execution;
 
     console.log(chalk.green(`\n✅ Execution started!`));
     console.log(chalk.cyan(`Execution ID: ${execution.id}`));
     console.log(chalk.gray(`Status: ${execution.status}`));
+    console.log(chalk.gray(`Timeout: ${timeoutMs / 1000}s, Max retries: ${maxRetries}, Poll interval: ${pollIntervalMs / 1000}s`));
 
     // Poll for completion
     let status = execution.status;
     while (status === 'running') {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      const statusResponse = await axios.get(
-        `${apiUrl}/api/workflows/executions/${execution.id}`
-      );
-      status = statusResponse.data.execution.status;
+      // Check timeout
+      const elapsed = Date.now() - startTime;
+      if (elapsed >= timeoutMs) {
+        console.log(chalk.yellow(`\n⏱️  Timeout exceeded (${timeoutMs / 1000}s)`));
+        throw new Error(
+          `Workflow execution timed out after ${timeoutMs / 1000} seconds. Execution ID: ${lastKnownExecution?.id}, Last status: ${lastKnownExecution?.status}`
+        );
+      }
 
-      if (status === 'completed') {
-        console.log(chalk.green('\n✅ Execution completed!'));
-        console.log(JSON.stringify(statusResponse.data.execution.results, null, 2));
-      } else if (status === 'failed') {
-        console.log(chalk.red('\n❌ Execution failed!'));
-        console.log(chalk.red(statusResponse.data.execution.error));
+      // Wait before polling (use retry backoff if we're in retry mode, otherwise use poll interval)
+      const waitTime = consecutiveRetries > 0 ? retryBackoffMs : pollIntervalMs;
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
+
+      // Fetch status with retry handling
+      try {
+        const statusResponse = await axios.get(
+          `${apiUrl}/api/workflows/executions/${execution.id}`
+        );
+        
+        // Reset retry counter and backoff on successful fetch
+        consecutiveRetries = 0;
+        retryBackoffMs = pollIntervalMs;
+        
+        lastKnownExecution = statusResponse.data.execution;
+        status = lastKnownExecution.status;
+
+        if (status === 'completed') {
+          console.log(chalk.green('\n✅ Execution completed!'));
+          console.log(JSON.stringify(lastKnownExecution.results, null, 2));
+          return true;
+        } else if (status === 'failed') {
+          console.log(chalk.red('\n❌ Execution failed!'));
+          console.log(chalk.red(lastKnownExecution.error || 'Unknown error'));
+          return false;
+        }
+      } catch (fetchError: any) {
+        consecutiveRetries++;
+        console.log(
+          chalk.yellow(
+            `⚠️  Status fetch failed (retry ${consecutiveRetries}/${maxRetries}): ${fetchError.message}`
+          )
+        );
+
+        if (consecutiveRetries >= maxRetries) {
+          console.log(chalk.red(`\n❌ Max retry limit (${maxRetries}) reached`));
+          throw new Error(
+            `Failed to fetch execution status after ${maxRetries} consecutive retries. Execution ID: ${lastKnownExecution?.id}, Last status: ${lastKnownExecution?.status}, Last error: ${fetchError.message}`
+          );
+        }
+
+        // Exponential backoff for retries (capped at maxBackoffMs)
+        retryBackoffMs = Math.min(retryBackoffMs * 2, maxBackoffMs);
+        console.log(chalk.gray(`   Retrying in ${retryBackoffMs / 1000}s...`));
+        
+        // Continue loop to retry (will use retryBackoffMs on next iteration)
+        continue;
       }
     }
+
+    return status === 'completed';
   } catch (error: any) {
-    console.error(chalk.red('Error executing workflow:'), error.message);
+    console.error(chalk.red('\n❌ Error executing workflow:'), error.message);
+    
+    // Log latest known execution details
+    if (lastKnownExecution) {
+      console.log(chalk.yellow('\n📊 Latest known execution details:'));
+      console.log(chalk.cyan(`  Execution ID: ${lastKnownExecution.id}`));
+      console.log(chalk.cyan(`  Status: ${lastKnownExecution.status}`));
+      if (lastKnownExecution.error) {
+        console.log(chalk.red(`  Error: ${lastKnownExecution.error}`));
+      }
+    }
+    
+    // Re-throw to allow caller to handle exit codes
+    throw error;
   }
 }
 

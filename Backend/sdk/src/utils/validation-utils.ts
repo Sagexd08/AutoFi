@@ -120,29 +120,74 @@ function extractMinimalRequestMetadata(request: unknown): Record<string, unknown
  */
 export class ValidationUtils {
   /**
+   * Private helper to handle Zod validation errors consistently.
+   * 
+   * @param schema - Zod schema to validate against
+   * @param value - Value to validate
+   * @param defaultFieldName - Default field name if path is empty
+   * @param defaultErrorMessage - Default error message if Zod error has no message
+   * @param redactValue - Whether to redact the value in error context
+   * @param valueTransformer - Optional function to transform value for error context
+   * @param causeTransformer - Optional function to transform the error cause
+   * @throws ValidationError if validation fails
+   */
+  private handleValidationError(
+    schema: z.ZodTypeAny,
+    value: unknown,
+    defaultFieldName: string,
+    defaultErrorMessage: string,
+    redactValue: boolean = false,
+    valueTransformer?: (val: unknown) => unknown,
+    causeTransformer?: (error: z.ZodError) => Error
+  ): void {
+    try {
+      schema.parse(value);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const firstError = error.issues[0];
+        const fieldPath = firstError?.path.length 
+          ? firstError.path.join('.') 
+          : defaultFieldName;
+        
+        let errorValue: unknown;
+        if (redactValue) {
+          errorValue = '[REDACTED]';
+        } else if (valueTransformer) {
+          errorValue = valueTransformer(value);
+        } else {
+          errorValue = value;
+        }
+        
+        const errorCause = causeTransformer ? causeTransformer(error) : (error as Error);
+        
+        throw new ValidationError(
+          firstError?.message ?? defaultErrorMessage,
+          {
+            field: fieldPath,
+            value: errorValue,
+            reason: firstError?.message,
+            cause: errorCause,
+          }
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Validates an Ethereum address.
    * 
    * @param address - Address to validate
    * @throws ValidationError if address is invalid
    */
   validateAddress(address: string): void {
-    try {
-      AddressSchema.parse(address);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const firstError = (error as any).errors?.[0];
-        throw new ValidationError(
-          firstError?.message ?? 'Invalid address',
-          {
-            field: 'address',
-            value: address,
-            reason: firstError?.message,
-            cause: error as Error,
-          }
-        );
-      }
-      throw error;
-    }
+    this.handleValidationError(
+      AddressSchema,
+      address,
+      'address',
+      'Invalid address',
+      false
+    );
   }
 
   /**
@@ -152,26 +197,14 @@ export class ValidationUtils {
    * @throws ValidationError if request is invalid
    */
   validateTransactionRequest(request: unknown): void {
-    try {
-      TransactionRequestSchema.parse(request);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const firstError = (error as any).errors?.[0];
-        const fieldPath = firstError?.path.length 
-          ? firstError.path.join('.') 
-          : '<root>';
-        throw new ValidationError(
-          firstError?.message ?? 'Invalid transaction request',
-          {
-            field: fieldPath,
-            value: extractMinimalRequestMetadata(request),
-            reason: firstError?.message,
-            cause: error as Error,
-          }
-        );
-      }
-      throw error;
-    }
+    this.handleValidationError(
+      TransactionRequestSchema,
+      request,
+      '<root>',
+      'Invalid transaction request',
+      false,
+      extractMinimalRequestMetadata
+    );
   }
 
   /**
@@ -181,23 +214,14 @@ export class ValidationUtils {
    * @throws ValidationError if config is invalid
    */
   validateAgentConfig(config: unknown): void {
-    try {
-      AgentConfigSchema.parse(config);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const firstError = (error as any).errors?.[0];
-        throw new ValidationError(
-          firstError?.message ?? 'Invalid agent config',
-          {
-            field: firstError?.path.join('.') || 'config',
-            value: sanitizeConfigObject(config),
-            reason: firstError?.message,
-            cause: error as Error,
-          }
-        );
-      }
-      throw error;
-    }
+    this.handleValidationError(
+      AgentConfigSchema,
+      config,
+      'config',
+      'Invalid agent config',
+      false,
+      sanitizeConfigObject
+    );
   }
 
   /**
@@ -207,23 +231,14 @@ export class ValidationUtils {
    * @throws ValidationError if config is invalid
    */
   validateContractConfig(config: unknown): void {
-    try {
-      ContractConfigSchema.parse(config);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const firstError = (error as any).errors?.[0];
-        throw new ValidationError(
-          firstError?.message ?? 'Invalid contract config',
-          {
-            field: firstError?.path.join('.') || 'config',
-            value: sanitizeConfigObject(config),
-            reason: firstError?.message,
-            cause: error as Error,
-          }
-        );
-      }
-      throw error;
-    }
+    this.handleValidationError(
+      ContractConfigSchema,
+      config,
+      'config',
+      'Invalid contract config',
+      false,
+      sanitizeConfigObject
+    );
   }
 
   /**
@@ -233,28 +248,26 @@ export class ValidationUtils {
    * @throws ValidationError if private key is invalid
    */
   validatePrivateKey(privateKey: string): void {
-    try {
-      z.string().regex(/^0x[a-fA-F0-9]{64}$/, 'Invalid private key format').parse(privateKey);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const firstError = (error as any).errors?.[0];
-        // Create a sanitized error cause to prevent private key exposure
-        const sanitizedError = new Error(firstError?.message ?? 'Invalid private key format');
-        sanitizedError.name = error.name;
-        sanitizedError.stack = error.stack;
-        
-        throw new ValidationError(
-          firstError?.message ?? 'Invalid private key',
-          {
-            field: 'privateKey',
-            value: '<redacted>',
-            reason: firstError?.message,
-            cause: sanitizedError,
-          }
-        );
-      }
-      throw error;
-    }
+    const privateKeySchema = z.string().regex(/^0x[a-fA-F0-9]{64}$/, 'Invalid private key format');
+    const causeTransformer = (error: z.ZodError): Error => {
+      const firstError = error.issues[0];
+      // Create a sanitized error cause to prevent private key exposure
+      const sanitizedError = new Error(firstError?.message ?? 'Invalid private key format');
+      sanitizedError.name = error.name;
+      sanitizedError.stack = error.stack;
+      return sanitizedError;
+    };
+    
+    // Use custom value transformer to use '<redacted>' instead of '[REDACTED]'
+    this.handleValidationError(
+      privateKeySchema,
+      privateKey,
+      'privateKey',
+      'Invalid private key',
+      false,
+      () => '<redacted>',
+      causeTransformer
+    );
   }
 
   /**
@@ -264,26 +277,18 @@ export class ValidationUtils {
    * @throws ValidationError if chain ID is invalid
    */
   validateChainId(chainId: string | number): void {
-    try {
-      z.union([
-        z.string().transform((val) => parseInt(val, 10)),
-        z.number(),
-      ]).pipe(z.number().int().positive('Chain ID must be a positive number')).parse(chainId);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const firstError = (error as any).errors?.[0];
-        throw new ValidationError(
-          firstError?.message ?? 'Invalid chain ID',
-          {
-            field: 'chainId',
-            value: chainId,
-            reason: firstError?.message,
-            cause: error as Error,
-          }
-        );
-      }
-      throw error;
-    }
+    const chainIdSchema = z.union([
+      z.string().transform((val) => parseInt(val, 10)),
+      z.number(),
+    ]).pipe(z.number().int().positive('Chain ID must be a positive number'));
+    
+    this.handleValidationError(
+      chainIdSchema,
+      chainId,
+      'chainId',
+      'Invalid chain ID',
+      false
+    );
   }
 
   /**
@@ -293,23 +298,13 @@ export class ValidationUtils {
    * @throws ValidationError if amount is invalid
    */
   validateAmount(amount: string): void {
-    try {
-      NonNegativeNumberStringSchema.parse(amount);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const firstError = (error as any).errors?.[0];
-        throw new ValidationError(
-          firstError?.message ?? 'Invalid amount',
-          {
-            field: 'amount',
-            value: amount,
-            reason: firstError?.message,
-            cause: error as Error,
-          }
-        );
-      }
-      throw error;
-    }
+    this.handleValidationError(
+      NonNegativeNumberStringSchema,
+      amount,
+      'amount',
+      'Invalid amount',
+      false
+    );
   }
 
   /**
@@ -319,25 +314,17 @@ export class ValidationUtils {
    * @throws ValidationError if gas price is invalid
    */
   validateGasPrice(gasPrice: string): void {
-    try {
-      NumberStringSchema.pipe(z.string().refine((val) => parseInt(val, 10) > 0, {
-        message: 'Gas price must be positive',
-      })).parse(gasPrice);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const firstError = (error as any).errors?.[0];
-        throw new ValidationError(
-          firstError?.message ?? 'Invalid gas price',
-          {
-            field: 'gasPrice',
-            value: gasPrice,
-            reason: firstError?.message,
-            cause: error as Error,
-          }
-        );
-      }
-      throw error;
-    }
+    const gasPriceSchema = NumberStringSchema.pipe(z.string().refine((val) => parseInt(val, 10) > 0, {
+      message: 'Gas price must be positive',
+    }));
+    
+    this.handleValidationError(
+      gasPriceSchema,
+      gasPrice,
+      'gasPrice',
+      'Invalid gas price',
+      false
+    );
   }
 
   /**
@@ -347,23 +334,13 @@ export class ValidationUtils {
    * @throws ValidationError if URL is invalid
    */
   validateUrl(url: string): void {
-    try {
-      z.string().url('Invalid URL format').parse(url);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const firstError = (error as any).errors?.[0];
-        throw new ValidationError(
-          firstError?.message ?? 'Invalid URL',
-          {
-            field: 'url',
-            value: url,
-            reason: firstError?.message,
-            cause: error as Error,
-          }
-        );
-      }
-      throw error;
-    }
+    this.handleValidationError(
+      z.string().url('Invalid URL format'),
+      url,
+      'url',
+      'Invalid URL',
+      false
+    );
   }
 
   /**
@@ -373,23 +350,14 @@ export class ValidationUtils {
    * @throws ValidationError if API key is invalid
    */
   validateApiKey(apiKey: string): void {
-    try {
-      z.string().min(10, 'API key must be at least 10 characters long').parse(apiKey);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const firstError = (error as any).errors?.[0];
-        throw new ValidationError(
-          firstError?.message ?? 'Invalid API key',
-          {
-            field: 'apiKey',
-            value: `[REDACTED] (length: ${apiKey.length})`,
-            reason: firstError?.message,
-            cause: error as Error,
-          }
-        );
-      }
-      throw error;
-    }
+    this.handleValidationError(
+      z.string().min(10, 'API key must be at least 10 characters long'),
+      apiKey,
+      'apiKey',
+      'Invalid API key',
+      false,
+      (val) => `[REDACTED] (length: ${(val as string).length})`
+    );
   }
 
   /**
@@ -399,23 +367,14 @@ export class ValidationUtils {
    * @throws ValidationError if config is invalid
    */
   validateSDKConfig(config: unknown): void {
-    try {
-      SDKConfigSchema.parse(config);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const firstError = (error as any).errors?.[0];
-        throw new ValidationError(
-          firstError?.message ?? 'Invalid SDK config',
-          {
-            field: firstError?.path.join('.') || 'config',
-            value: sanitizeConfigObject(config),
-            reason: firstError?.message,
-            cause: error as Error,
-          }
-        );
-      }
-      throw error;
-    }
+    this.handleValidationError(
+      SDKConfigSchema,
+      config,
+      'config',
+      'Invalid SDK config',
+      false,
+      sanitizeConfigObject
+    );
   }
 
   /**
@@ -425,22 +384,13 @@ export class ValidationUtils {
    * @throws ValidationError if config is invalid
    */
   validateChainConfig(config: unknown): void {
-    try {
-      ChainConfigSchema.parse(config);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const firstError = (error as any).errors?.[0];
-        throw new ValidationError(
-          firstError?.message ?? 'Invalid chain config',
-          {
-            field: firstError?.path.join('.') || 'config',
-            value: sanitizeConfigObject(config),
-            reason: firstError?.message,
-            cause: error as Error,
-          }
-        );
-      }
-      throw error;
-    }
+    this.handleValidationError(
+      ChainConfigSchema,
+      config,
+      'config',
+      'Invalid chain config',
+      false,
+      sanitizeConfigObject
+    );
   }
 }

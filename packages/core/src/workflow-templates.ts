@@ -1,17 +1,17 @@
-import { writeFileSync } from 'fs';
-import { join } from 'path';
+import { writeFileSync, mkdirSync } from 'fs';
+import { join, dirname } from 'path';
 import type { WorkflowTemplate } from '@celo-automator/types';
 
 export const workflowTemplates: WorkflowTemplate[] = [
   {
     id: 'dao-treasury-split',
     name: 'DAO Treasury Split',
-    description: 'Automatically split DAO funds: 10% to treasury when receiving 100+ cUSD',
+    description: 'Automatically split DAO funds: send fixed 10 cUSD to treasury when receiving 100+ cUSD',
     category: 'DAO',
     tags: ['dao', 'treasury', 'automation'],
     workflow: {
       name: 'DAO Treasury Split',
-      description: 'When DAO receives 100+ cUSD, send 10% to treasury',
+      description: 'When DAO receives 100+ cUSD, send fixed 10 cUSD to treasury',
       trigger: {
         type: 'event',
         event: {
@@ -97,6 +97,17 @@ export const workflowTemplates: WorkflowTemplate[] = [
 
 export function saveWorkflowTemplate(template: WorkflowTemplate, outputDir: string = './examples') {
   const filename = join(outputDir, `${template.id}.json`);
-  writeFileSync(filename, JSON.stringify(template.workflow, null, 2));
-  console.log(`Saved template to ${filename}`);
+  
+  try {
+    // Ensure the output directory exists
+    mkdirSync(dirname(filename), { recursive: true });
+    
+    // Write the file
+    writeFileSync(filename, JSON.stringify(template.workflow, null, 2));
+    console.log(`Saved template to ${filename}`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`Failed to save workflow template to ${filename}: ${errorMessage}`);
+    throw error;
+  }
 }

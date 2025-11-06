@@ -7,7 +7,6 @@ import type { Workflow, WorkflowExecution } from '@celo-automator/types';
 import { generateId } from '@celo-automator/core';
 
 const router: Router = express.Router();
-
 // In-memory storage (replace with database in production)
 const workflows: Map<string, Workflow> = new Map();
 const executions: Map<string, WorkflowExecution> = new Map();
@@ -17,9 +16,8 @@ let celoClient: CeloClient | undefined;
 let agent: LangChainAgent | undefined;
 let orchestrator: WorkflowOrchestrator | undefined;
 
-// Initialize asynchronously
-(async () => {
-  if (process.env.CELO_PRIVATE_KEY) {
+if (process.env.CELO_PRIVATE_KEY) {
+  try {
     celoClient = new CeloClient({
       privateKey: process.env.CELO_PRIVATE_KEY,
       network: (process.env.CELO_NETWORK as 'alfajores' | 'mainnet') || 'alfajores',
@@ -36,6 +34,13 @@ let orchestrator: WorkflowOrchestrator | undefined;
       celoClient,
     });
 
+    orchestrator = new WorkflowOrchestrator(agent);
+    console.log('✅ Workflow orchestrator initialized successfully');
+  } catch (error) {
+    console.error('❌ Failed to initialize workflow orchestrator:', error);
+    // Orchestrator will remain undefined, endpoints will return 503
+  }
+}
     if (agent) {
       orchestrator = new WorkflowOrchestrator(agent);
     }
@@ -91,7 +96,33 @@ router.post('/', async (req, res, next) => {
       });
     }
 
-    const id = workflow.id || generateId('workflow');
+    let id: string;
+    
+    if (workflow.id) {
+      // Client provided an ID - check for collision
+      if (workflows.has(workflow.id)) {
+        return res.status(409).json({
+          success: false,
+          error: 'Workflow ID already exists',
+        });
+      }
+      id = workflow.id;
+    } else {
+      // Generate ID and ensure it doesn't collide
+      let attempts = 0;
+      const maxAttempts = 100; // Prevent infinite loop
+      do {
+        id = generateId('workflow');
+        attempts++;
+        if (attempts >= maxAttempts) {
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to generate unique workflow ID',
+          });
+        }
+      } while (workflows.has(id));
+    }
+
     workflow.id = id;
     workflows.set(id, workflow);
 
