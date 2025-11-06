@@ -35,6 +35,13 @@ export interface LoggerConfig extends Partial<SDKConfig> {
   usePino?: boolean;
   winstonConfig?: unknown;
   pinoConfig?: unknown;
+  /**
+   * Enable pretty-printed JSON logs (2-space indentation).
+   * If not specified, defaults to false in production (NODE_ENV=production)
+   * and true in development, or can be set via LOG_PRETTY environment variable.
+   * Compact one-line JSON is recommended for production to reduce log volume and improve parsing.
+   */
+  prettyLogs?: boolean;
 }
 
 
@@ -43,6 +50,7 @@ export class StructuredLogger implements Logger {
   private correlationId?: string;
   private readonly enableMasking: boolean;
   private readonly masker: DataMasker;
+  private readonly prettyLogs: boolean;
   private winstonLogger?: any;
   private pinoLogger?: any;
 
@@ -51,6 +59,14 @@ export class StructuredLogger implements Logger {
     this.logLevel = this.parseLogLevel(level);
     this.enableMasking = config.enableMasking ?? true;
     
+    // Determine pretty log formatting: config > env var > default (false in production, true in development)
+    if (config.prettyLogs !== undefined) {
+      this.prettyLogs = config.prettyLogs;
+    } else if (process.env.LOG_PRETTY !== undefined) {
+      this.prettyLogs = process.env.LOG_PRETTY === 'true' || process.env.LOG_PRETTY === '1';
+    } else {
+      this.prettyLogs = process.env.NODE_ENV !== 'production';
+    }
     
     this.masker = new DataMasker(config.maskingConfig || {
       strategy: process.env.NODE_ENV === 'production' ? 'full' : 'partial',
@@ -74,7 +90,7 @@ export class StructuredLogger implements Logger {
         format: winston.format.combine(
           winston.format.timestamp(),
           winston.format.json(),
-          winston.format((info) => {
+          winston.format((info: any) => {
             
             if (this.enableMasking && info.message) {
               info.message = this.masker.sanitizeString(String(info.message));
@@ -116,8 +132,8 @@ export class StructuredLogger implements Logger {
       
       
       if (this.enableMasking) {
-        pinoConfig.serializers = {
-          ...pinoConfig.serializers,
+        (pinoConfig as any).serializers = {
+          ...(pinoConfig as any).serializers,
           '*': (value: unknown) => {
             if (typeof value === 'object' && value !== null) {
               return this.masker.maskObject(value as Record<string, unknown>);
@@ -251,7 +267,9 @@ export class StructuredLogger implements Logger {
     }
 
     
-    const logOutput = JSON.stringify(entry, null, 2);
+    const logOutput = this.prettyLogs 
+      ? JSON.stringify(entry, null, 2)
+      : JSON.stringify(entry);
 
     switch (level) {
       case LogLevel.DEBUG:

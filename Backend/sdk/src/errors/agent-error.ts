@@ -5,6 +5,7 @@ import { ERROR_CODES } from '../constants/errors';
  * Error thrown when agent-related operations fail.
  */
 export class AgentError extends SDKError {
+  public override readonly name: string = 'AgentError';
   public readonly agentId?: string;
   public readonly agentType?: string;
   public readonly operation?: string;
@@ -31,18 +32,16 @@ export class AgentError extends SDKError {
       recoverable?: boolean;
       cause?: Error;
     } = {}
-  ) {
     super(ERROR_CODES.AGENT_NOT_FOUND, message, {
       context: {
+        ...options.context,
         agentId: options.agentId,
         agentType: options.agentType,
         operation: options.operation,
-        ...options.context,
       },
       recoverable: options.recoverable ?? true,
       cause: options.cause,
-    });
-    this.name = 'AgentError';
+    });    });
     this.agentId = options.agentId;
     this.agentType = options.agentType;
     this.operation = options.operation;

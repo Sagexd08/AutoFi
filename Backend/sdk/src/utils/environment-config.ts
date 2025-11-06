@@ -79,12 +79,21 @@ export class EnvironmentConfigManager {
     
     return {
       ...baseConfig,
-      enableMasking: process.env.ENABLE_MASKING === 'true' || baseConfig.enableMasking,
-      maskingStrategy: (process.env.MASKING_STRATEGY as any) || baseConfig.maskingStrategy,
-      logLevel: (process.env.LOG_LEVEL as any) || baseConfig.logLevel,
-      enableEncryption: process.env.ENABLE_ENCRYPTION === 'true' || baseConfig.enableEncryption,
-      enableAuditLogging: process.env.ENABLE_AUDIT_LOGGING === 'true' || baseConfig.enableAuditLogging,
-      gdprCompliant: process.env.GDPR_COMPLIANT === 'true' || baseConfig.gdprCompliant,
+      enableMasking: process.env.ENABLE_MASKING !== undefined 
+        ? process.env.ENABLE_MASKING === 'true' 
+        : baseConfig.enableMasking,
+      enableEncryption: process.env.ENABLE_ENCRYPTION !== undefined
+        ? process.env.ENABLE_ENCRYPTION === 'true'
+        : baseConfig.enableEncryption,
+      enableAuditLogging: process.env.ENABLE_AUDIT_LOGGING !== undefined
+        ? process.env.ENABLE_AUDIT_LOGGING === 'true'
+        : baseConfig?.enableAuditLogging,
+      gdprCompliant: process.env.GDPR_COMPLIANT !== undefined
+        ? process.env.GDPR_COMPLIANT === 'true'
+        : baseConfig.gdprCompliant,
+      logLevel: (['debug', 'info', 'warn', 'error'].includes(process.env.LOG_LEVEL as string))
+        ? (process.env.LOG_LEVEL as 'debug' | 'info' | 'warn' | 'error')
+        : baseConfig.logLevel,
       maskFields: process.env.MASK_FIELDS 
         ? process.env.MASK_FIELDS.split(',')
         : baseConfig.maskFields,

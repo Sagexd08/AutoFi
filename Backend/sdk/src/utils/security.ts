@@ -29,6 +29,22 @@ export class EncryptionUtil {
   }
 
   
+  private async deriveKeyAsync(password: string, salt: Buffer): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      crypto.pbkdf2(
+        password,
+        salt,
+        this.config.iterations,
+        this.config.keyLength,
+        'sha256',
+        (err, derivedKey) => {
+          if (err) reject(err);
+          else resolve(derivedKey);
+        }
+      );
+    });
+  }
+
   private deriveKey(password: string, salt: Buffer): Buffer {
     return crypto.pbkdf2Sync(
       password,
@@ -38,7 +54,6 @@ export class EncryptionUtil {
       'sha256'
     );
   }
-
   
   encrypt(data: string, password: string): string {
     try {
@@ -131,16 +146,21 @@ export class TokenManager {
   ): string {
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = Date.now() + expiresInMs;
+    const now = Date.now();
 
     this.tokens.set(token, {
       payload,
       expiresAt,
-      createdAt: Date.now(),
+      createdAt: now,
+      lastAccess: now,
     });
 
+    // Always cleanup expired tokens first
+    this.cleanupExpiredTokens();
     
-    if (this.tokens.size > this.maxTokens) {
-      this.cleanupExpiredTokens();
+    // If still over limit, evict least recently used tokens
+    while (this.tokens.size > this.maxTokens) {
+      this.evictOldestToken();
     }
 
     return token;
@@ -158,6 +178,9 @@ export class TokenManager {
       this.tokens.delete(token);
       return null;
     }
+
+    // Update lastAccess timestamp for LRU tracking
+    tokenInfo.lastAccess = Date.now();
 
     return tokenInfo.payload;
   }
@@ -178,6 +201,32 @@ export class TokenManager {
   }
 
   
+  private evictOldestToken(): void {
+    if (this.tokens.size === 0) {
+      return;
+    }
+
+    let oldestToken: string | null = null;
+    let oldestTimestamp: number = Infinity;
+
+    // Find the token with the oldest lastAccess (or createdAt if lastAccess doesn't exist)
+    for (const [token, info] of this.tokens.entries()) {
+      // Use lastAccess if available, otherwise fall back to createdAt
+      const accessTime = info.lastAccess ?? info.createdAt;
+      
+      if (accessTime < oldestTimestamp) {
+        oldestTimestamp = accessTime;
+        oldestToken = token;
+      }
+    }
+
+    // Remove the oldest token
+    if (oldestToken !== null) {
+      this.tokens.delete(oldestToken);
+    }
+  }
+
+  
   getActiveTokens(): string[] {
     this.cleanupExpiredTokens();
     return Array.from(this.tokens.keys());
@@ -189,6 +238,7 @@ interface TokenInfo {
   payload: Record<string, unknown>;
   expiresAt: number;
   createdAt: number;
+  lastAccess?: number;
 }
 
 
@@ -196,9 +246,7 @@ export class SecureStorage {
   private readonly encryption: EncryptionUtil;
   private readonly storage: Map<string, string> = new Map();
 
-  constructor(encryptionKey: string) {
-    this.encryption = new EncryptionUtil();
-    
+  constructor() {
     this.encryption = new EncryptionUtil();
   }
 
@@ -240,32 +288,79 @@ export class SecureStorage {
 
 
 export class GDPRCompliance {
+  private static readonly PII_FIELDS = ['email', 'phone', 'address', 'name', 'ssn', 'ip'] as const;
   
   static anonymize(data: Record<string, unknown>): Record<string, unknown> {
-    const anonymized = { ...data };
+    const piiFieldsLower = new Set(GDPRCompliance.PII_FIELDS.map(field => field.toLowerCase()));
     
+    const isPIIField = (fieldName: string): boolean => {
+      return piiFieldsLower.has(fieldName.toLowerCase());
+    };
     
-    const piiFields = ['email', 'phone', 'address', 'name', 'ssn', 'ip'];
-    for (const field of piiFields) {
-      if (anonymized[field]) {
-        anonymized[field] = '***REDACTED***';
+    const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+      return (
+        typeof value === 'object' &&
+        value !== null &&
+        !Array.isArray(value) &&
+        Object.prototype.toString.call(value) === '[object Object]' &&
+        value.constructor === Object
+      );
+    };
+    
+    const deepAnonymize = (value: unknown, visited: WeakSet<object> = new WeakSet()): unknown => {
+      // Handle null or undefined
+      if (value === null || value === undefined) {
+        return value;
       }
-    }
-
-    return anonymized;
+      
+      // Handle primitives (string, number, boolean, symbol, bigint)
+      if (typeof value !== 'object') {
+        return value;
+      }
+      
+      // Avoid circular references
+      if (visited.has(value as object)) {
+        return '***CIRCULAR***';
+      }
+      
+      // Handle arrays
+      if (Array.isArray(value)) {
+        visited.add(value);
+        return value.map(item => deepAnonymize(item, visited));
+      }
+      
+      // Handle plain objects only
+      if (isPlainObject(value)) {
+        visited.add(value);
+        const anonymized: Record<string, unknown> = {};
+        
+        for (const [key, val] of Object.entries(value)) {
+          if (isPIIField(key)) {
+            anonymized[key] = '***REDACTED***';
+          } else {
+            anonymized[key] = deepAnonymize(val, visited);
+          }
+        }
+        
+        return anonymized;
+      }
+      
+      // For non-plain objects (functions, dates, class instances, etc.), return as-is
+      return value;
+    };
+    
+    return deepAnonymize(data) as Record<string, unknown>;
   }
 
   
   static containsPII(data: Record<string, unknown>): boolean {
-    const piiFields = ['email', 'phone', 'address', 'name', 'ssn', 'ip'];
-    return piiFields.some(field => data[field] !== undefined);
+    return GDPRCompliance.PII_FIELDS.some(field => data[field] !== undefined);
   }
 
   
   static removePII(data: Record<string, unknown>): Record<string, unknown> {
     const cleaned = { ...data };
-    const piiFields = ['email', 'phone', 'address', 'name', 'ssn', 'ip'];
-    piiFields.forEach(field => delete cleaned[field]);
+    GDPRCompliance.PII_FIELDS.forEach(field => delete cleaned[field]);
     return cleaned;
   }
 }

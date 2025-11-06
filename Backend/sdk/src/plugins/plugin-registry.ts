@@ -1,4 +1,5 @@
-import type { Plugin, PluginRegistry, SDKConfig } from '../types/config';
+import type { Plugin, PluginRegistry, PluginDependencies } from './types';
+import type { SDKConfig } from '../types/config';
 import { SDKError } from '../errors';
 import { ERROR_CODES } from '../constants/errors';
 
@@ -6,9 +7,18 @@ import { ERROR_CODES } from '../constants/errors';
 export class DefaultPluginRegistry implements PluginRegistry {
   private plugins = new Map<string, Plugin>();
   private initialized = false;
+  private started = false;
 
   
   register(plugin: Plugin): void {
+    if (this.initialized) {
+      throw new SDKError(
+        ERROR_CODES.CONFIGURATION_ERROR,
+        `Cannot register plugin "${plugin.metadata.name}" after initialization has completed`,
+        { recoverable: false }
+      );
+    }
+
     if (this.plugins.has(plugin.metadata.name)) {
       throw new SDKError(
         ERROR_CODES.CONFIGURATION_ERROR,
@@ -24,13 +34,41 @@ export class DefaultPluginRegistry implements PluginRegistry {
   }
 
   
-  unregister(name: string): void {
+  async unregister(name: string): Promise<void> {
     const plugin = this.plugins.get(name);
-    if (plugin) {
-      this.plugins.delete(name);
-      
-      this.validateDependents(name);
+    if (!plugin) {
+      return;
     }
+
+    
+    this.validateDependents(name);
+
+    
+    if (plugin.onStop) {
+      try {
+        const stopResult = plugin.onStop();
+        if (stopResult instanceof Promise) {
+          await stopResult;
+        }
+      } catch (error) {
+        console.error(`Error stopping plugin "${plugin.metadata.name}":`, error);
+      }
+    }
+
+    
+    if (plugin.onDestroy) {
+      try {
+        const destroyResult = plugin.onDestroy();
+        if (destroyResult instanceof Promise) {
+          await destroyResult;
+        }
+      } catch (error) {
+        console.error(`Error destroying plugin "${plugin.metadata.name}":`, error);
+      }
+    }
+
+    
+    this.plugins.delete(name);
   }
 
   
@@ -70,6 +108,22 @@ export class DefaultPluginRegistry implements PluginRegistry {
 
   
   async startAll(): Promise<void> {
+    if (!this.initialized) {
+      throw new SDKError(
+        ERROR_CODES.CONFIGURATION_ERROR,
+        'Cannot start plugins before initialization has completed. Call initializeAll() first.',
+        { recoverable: false }
+      );
+    }
+
+    if (this.started) {
+      throw new SDKError(
+        ERROR_CODES.CONFIGURATION_ERROR,
+        'Plugins have already been started. Call stopAll() before starting again.',
+        { recoverable: false }
+      );
+    }
+
     const sortedPlugins = this.sortByDependencies();
 
     for (const plugin of sortedPlugins) {
@@ -85,6 +139,8 @@ export class DefaultPluginRegistry implements PluginRegistry {
         }
       }
     }
+
+    this.started = true;
   }
 
   
@@ -101,6 +157,8 @@ export class DefaultPluginRegistry implements PluginRegistry {
         }
       }
     }
+
+    this.started = false;
   }
 
   
@@ -120,6 +178,7 @@ export class DefaultPluginRegistry implements PluginRegistry {
 
     this.plugins.clear();
     this.initialized = false;
+    this.started = false;
   }
 
   
@@ -156,13 +215,35 @@ export class DefaultPluginRegistry implements PluginRegistry {
 
   
   private validateDependents(pluginName: string): void {
+    const dependents: Array<{ name: string; dependencies: PluginDependencies }> = [];
+    
     for (const plugin of this.plugins.values()) {
       const deps = plugin.metadata.dependencies;
       if (deps?.requires?.includes(pluginName)) {
-        console.warn(
-          `Plugin "${plugin.metadata.name}" depends on "${pluginName}" which was unregistered`
-        );
+        dependents.push({
+          name: plugin.metadata.name,
+          dependencies: deps,
+        });
       }
+    }
+    
+    if (dependents.length > 0) {
+      const dependentNames = dependents.map(d => d.name).join('", "');
+      throw new SDKError(
+        ERROR_CODES.CONFIGURATION_ERROR,
+        `Cannot unregister plugin "${pluginName}" because ${dependents.length} plugin(s) require it: "${dependentNames}"`,
+        {
+          recoverable: false,
+          context: {
+            pluginName,
+            dependentPlugins: dependents.map(d => ({
+              name: d.name,
+              requiredDependencies: d.dependencies.requires || [],
+              optionalDependencies: d.dependencies.optional || [],
+            })),
+          },
+        }
+      );
     }
   }
 

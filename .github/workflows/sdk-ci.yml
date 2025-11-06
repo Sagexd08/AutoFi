@@ -35,7 +35,7 @@ jobs:
     
     - name: Run security audit
       working-directory: Backend/sdk
-      run: npm run security:check || true
+      run: npm run security:warning
     
     - name: Run tests
       working-directory: Backend/sdk
@@ -99,8 +99,6 @@ jobs:
       with:
         node-version: '18'
         registry-url: 'https://registry.npmjs.org'
-        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
     - name: Install dependencies
       working-directory: Backend/sdk
       run: npm ci

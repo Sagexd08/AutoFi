@@ -46,6 +46,9 @@ export class LRUCache implements CacheInterface {
     this.cleanupInterval = setInterval(() => {
       this.cleanup();
     }, interval);
+    if (this.cleanupInterval) {
+      this.cleanupInterval.unref();
+    }
   }
 
   /**
@@ -57,7 +60,7 @@ export class LRUCache implements CacheInterface {
     while (node) {
       const next = node.prev;
       if (now >= node.expiresAt) {
-        this.removeNode(node);
+        this.removeNode(node as LRUNode<unknown>);
         this.cache.delete(node.key);
       }
       node = next;
@@ -69,10 +72,10 @@ export class LRUCache implements CacheInterface {
    */
   private addToHead<T>(node: LRUNode<T>): void {
     node.prev = null;
-    node.next = this.head;
+    node.next = this.head as LRUNode<T> | null;
 
     if (this.head) {
-      this.head.prev = node;
+      (this.head as LRUNode<T>).prev = node;
     } else {
       this.tail = node;
     }
@@ -109,7 +112,7 @@ export class LRUCache implements CacheInterface {
    * Gets a value from cache.
    */
   get<T>(key: string): T | undefined {
-    const node = this.cache.get(key);
+    const node = this.cache.get(key) as LRUNode<T> | undefined;
     if (!node) {
       this.misses++;
       return undefined;
@@ -133,7 +136,7 @@ export class LRUCache implements CacheInterface {
    */
   set<T>(key: string, value: T, ttl?: number): void {
     const expiresAt = Date.now() + (ttl ?? this.defaultTTL);
-    let node = this.cache.get(key);
+    let node = this.cache.get(key) as LRUNode<T> | undefined;
 
     if (node) {
       node.value = value;
@@ -160,7 +163,7 @@ export class LRUCache implements CacheInterface {
   delete(key: string): void {
     const node = this.cache.get(key);
     if (node) {
-      this.removeNode(node);
+      this.removeNode(node as LRUNode<unknown>);
       this.cache.delete(key);
     }
   }
@@ -187,7 +190,7 @@ export class LRUCache implements CacheInterface {
 
     const now = Date.now();
     if (now >= node.expiresAt) {
-      this.removeNode(node);
+      this.removeNode(node as LRUNode<unknown>);
       this.cache.delete(key);
       return false;
     }

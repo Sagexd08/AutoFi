@@ -47,7 +47,7 @@ export interface PluginRegistry {
   register(plugin: Plugin): void;
 
   
-  unregister(name: string): void;
+  unregister(name: string): Promise<void>;
 
   
   get(name: string): Plugin | undefined;

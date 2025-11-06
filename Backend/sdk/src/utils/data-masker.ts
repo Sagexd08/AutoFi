@@ -43,19 +43,33 @@ const DEFAULT_SENSITIVE_FIELDS = [
 
 export class DataMasker {
   private config: Required<MaskingConfig>;
+  private maskFieldsSet: Set<string>;
+  private customMaskersMap: Map<string, (value: unknown) => string>;
 
   constructor(config: MaskingConfig = {}) {
     const environment = process.env.NODE_ENV || 'development';
     const envConfig = config.environmentRules?.[environment] || {};
     
+    const maskFields = config.maskFields || DEFAULT_SENSITIVE_FIELDS;
     this.config = {
-      maskFields: config.maskFields || DEFAULT_SENSITIVE_FIELDS,
+      maskFields,
       customMaskers: config.customMaskers || {},
       strategy: config.strategy || envConfig.strategy || 'partial',
       visibleChars: config.visibleChars ?? envConfig.visibleChars ?? 4,
       maskChar: config.maskChar || envConfig.maskChar || '*',
       environmentRules: config.environmentRules || {},
     };
+    
+    // Pre-build Set of lowercased maskFields for O(1) lookup
+    this.maskFieldsSet = new Set(maskFields.map(field => field.toLowerCase()));
+    
+    // Normalize customMaskers keys to lowercase for consistent lookup
+    this.customMaskersMap = new Map();
+    if (config.customMaskers) {
+      Object.entries(config.customMaskers).forEach(([key, masker]) => {
+        this.customMaskersMap.set(key.toLowerCase(), masker);
+      });
+    }
   }
 
   
@@ -85,14 +99,21 @@ export class DataMasker {
 
   
   private partialMask(value: string): string {
-    if (value.length <= this.config.visibleChars * 2) {
-      return this.config.maskChar.repeat(value.length);
+    // Compute visible chars ensuring at least 1 on each side and room for mask in middle
+    let visible = Math.max(1, Math.min(this.config.visibleChars, Math.floor((value.length - 1) / 2)));
+    
+    // Calculate masked length
+    let maskedLength = value.length - visible * 2;
+    
+    // If no room for mask char, fall back to minimal partial reveal
+    if (maskedLength <= 0) {
+      visible = Math.max(1, Math.floor(value.length / 2)) - 1;
+      maskedLength = value.length - visible * 2;
     }
-
-    const visible = Math.floor(this.config.visibleChars / 2);
+    
     const start = value.substring(0, visible);
     const end = value.substring(value.length - visible);
-    const masked = this.config.maskChar.repeat(value.length - visible * 2);
+    const masked = this.config.maskChar.repeat(maskedLength);
 
     return `${start}${masked}${end}`;
   }
@@ -104,7 +125,7 @@ export class DataMasker {
     for (let i = 0; i < value.length; i++) {
       const char = value.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; 
+      hash = hash | 0; 
     }
     return `hash_${Math.abs(hash).toString(16).substring(0, 8)}`;
   }
@@ -125,14 +146,13 @@ export class DataMasker {
       const lowerKey = key.toLowerCase();
       
       
-      const shouldMask = this.config.maskFields.some(field => 
-        lowerKey.includes(field.toLowerCase())
-      );
+      const shouldMask = this.maskFieldsSet.has(lowerKey);
 
       if (shouldMask) {
         
-        if (this.config.customMaskers[key]) {
-          masked[key] = this.config.customMaskers[key](value);
+        const customMasker = this.customMaskersMap.get(lowerKey);
+        if (customMasker) {
+          masked[key] = customMasker(value);
         } else {
           masked[key] = this.maskValue(value);
         }
@@ -230,31 +250,50 @@ export class DataMasker {
         if (match.includes('node_modules')) {
           return match;
         }
-        return this.maskValue(match);
+        // Keep filename and relative structure, mask only base path
+        const parts = match.split('/');
+        if (parts.length > 3) {
+          return `/<masked>/${parts.slice(-3).join('/')}`;
+        }
+        return match;
       });
       
       return this.sanitizeString(line);
     }).join('\n');
   }
-
   
   private shouldMaskField(fieldName: string): boolean {
     const lowerField = fieldName.toLowerCase();
-    return this.config.maskFields.some(field => 
-      lowerField.includes(field.toLowerCase())
-    );
+    return this.maskFieldsSet.has(lowerField);
   }
 
   
   updateConfig(config: Partial<MaskingConfig>): void {
+    const maskFields = config.maskFields || this.config.maskFields;
+    const customMaskers = config.customMaskers 
+      ? { ...this.config.customMaskers, ...config.customMaskers }
+      : this.config.customMaskers;
+    
     this.config = {
       ...this.config,
       ...config,
-      maskFields: config.maskFields || this.config.maskFields,
-      customMaskers: config.customMaskers 
-        ? { ...this.config.customMaskers, ...config.customMaskers }
-        : this.config.customMaskers,
+      maskFields,
+      customMaskers,
+      environmentRules: config.environmentRules 
+        ? { ...this.config.environmentRules, ...config.environmentRules }
+        : this.config.environmentRules,
     };
+    
+    // Rebuild Set of lowercased maskFields for O(1) lookup
+    this.maskFieldsSet = new Set(maskFields.map(field => field.toLowerCase()));
+    
+    // Rebuild Map of normalized customMaskers keys
+    this.customMaskersMap = new Map();
+    if (customMaskers) {
+      Object.entries(customMaskers).forEach(([key, masker]) => {
+        this.customMaskersMap.set(key.toLowerCase(), masker);
+      });
+    }
   }
 
   

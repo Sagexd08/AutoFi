@@ -70,6 +70,7 @@ export class CircuitBreaker {
   private failures: number[] = [];
   private readonly config: CircuitBreakerConfig;
   private lastFailureTime?: number;
+  private halfOpenInProgress: boolean = false;
 
   constructor(config: Partial<CircuitBreakerConfig> = {}) {
     this.config = { ...DEFAULT_CIRCUIT_BREAKER_CONFIG, ...config };
@@ -81,6 +82,15 @@ export class CircuitBreaker {
   async execute<T>(fn: () => Promise<T>): Promise<T> {
     if (this.state === CircuitState.OPEN) {
       if (this.lastFailureTime && Date.now() - this.lastFailureTime >= this.config.recoveryTimeout) {
+        // Atomic check-and-set: only one concurrent request can transition to HALF_OPEN
+        if (this.halfOpenInProgress) {
+          throw new SDKError(
+            ERROR_CODES.NETWORK_ERROR,
+            'Circuit breaker is open. Service is unavailable.',
+            { recoverable: true }
+          );
+        }
+        this.halfOpenInProgress = true;
         this.state = CircuitState.HALF_OPEN;
       } else {
         throw new SDKError(
@@ -98,6 +108,11 @@ export class CircuitBreaker {
     } catch (error) {
       this.onFailure();
       throw error;
+    } finally {
+      // Clear the flag in all outcomes to allow subsequent probes
+      if (this.state !== CircuitState.HALF_OPEN) {
+        this.halfOpenInProgress = false;
+      }
     }
   }
 
@@ -109,6 +124,7 @@ export class CircuitBreaker {
       this.state = CircuitState.CLOSED;
       this.failures = [];
       this.lastFailureTime = undefined;
+      this.halfOpenInProgress = false;
     }
   }
 
@@ -126,7 +142,11 @@ export class CircuitBreaker {
     );
 
     if (this.failures.length >= this.config.failureThreshold) {
+      const wasHalfOpen = this.state === CircuitState.HALF_OPEN;
       this.state = CircuitState.OPEN;
+      if (wasHalfOpen) {
+        this.halfOpenInProgress = false;
+      }
     }
   }
 
@@ -144,6 +164,7 @@ export class CircuitBreaker {
     this.state = CircuitState.CLOSED;
     this.failures = [];
     this.lastFailureTime = undefined;
+    this.halfOpenInProgress = false;
   }
 }
 
@@ -206,7 +227,7 @@ export async function retryWithBackoff<T>(
   const shouldRetry = retryConfig.shouldRetry ?? defaultShouldRetry;
   let lastError: unknown;
 
-  for (let attempt = 0; attempt <= retryConfig.maxAttempts; attempt++) {
+  for (let attempt = 0; attempt < retryConfig.maxAttempts; attempt++) {
     try {
       if (circuitBreaker) {
         return await circuitBreaker.execute(fn);
@@ -215,7 +236,7 @@ export async function retryWithBackoff<T>(
     } catch (error) {
       lastError = error;
 
-      if (attempt === retryConfig.maxAttempts || !shouldRetry(error)) {
+      if (attempt === retryConfig.maxAttempts - 1 || !shouldRetry(error)) {
         throw error;
       }
 
@@ -231,9 +252,6 @@ export async function retryWithBackoff<T>(
   throw lastError;
 }
 
-/**
- * Creates a retry function with pre-configured settings.
- */
 export function createRetryFunction<T>(
   config: Partial<RetryConfig> = {},
   circuitBreaker?: CircuitBreaker

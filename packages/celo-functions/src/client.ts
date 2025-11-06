@@ -6,6 +6,7 @@ import {
   PublicClient,
   WalletClient,
 } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
 import { celo, celoAlfajores } from 'viem/chains';
 
 const CELO_CHAINS = {
@@ -36,10 +37,11 @@ export class CeloClient {
     }) as PublicClient;
 
     if (config.privateKey) {
+      const account = privateKeyToAccount(config.privateKey as `0x${string}`);
       this.walletClient = createWalletClient({
         chain: this.chain,
         transport: http(rpcUrl),
-        account: config.privateKey as Address,
+        account,
       });
     }
   }

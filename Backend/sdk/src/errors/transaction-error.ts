@@ -5,6 +5,7 @@ import { ERROR_CODES } from '../constants/errors';
  * Error thrown when transaction-related operations fail.
  */
 export class TransactionError extends SDKError {
+  public override readonly name: string = 'TransactionError';
   public readonly txHash?: string;
   public readonly from?: string;
   public readonly to?: string;
@@ -50,7 +51,6 @@ export class TransactionError extends SDKError {
       recoverable: options.recoverable ?? false,
       cause: options.cause,
     });
-    this.name = 'TransactionError';
     this.txHash = options.txHash;
     this.from = options.from;
     this.to = options.to;

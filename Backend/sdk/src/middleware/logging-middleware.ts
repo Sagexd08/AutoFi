@@ -8,8 +8,17 @@ import type { SDKConfig } from '../types/config';
  * @returns Logging middleware
  */
 export function createLoggingMiddleware(config: SDKConfig): Middleware {
-  const logLevel = config.logLevel ?? 'info';
   const logLevels = ['debug', 'info', 'warn', 'error'];
+  const rawLogLevel = config.logLevel ?? 'info';
+  
+  // Validate logLevel against allowed values
+  const logLevel = logLevels.includes(rawLogLevel) ? rawLogLevel : 'info';
+  
+  // Warn if invalid log level was provided
+  if (rawLogLevel !== logLevel) {
+    console.warn(`[LoggingMiddleware] Invalid log level "${rawLogLevel}". Defaulting to "info". Valid levels are: ${logLevels.join(', ')}`);
+  }
+  
   const currentLevelIndex = logLevels.indexOf(logLevel);
 
   const shouldLog = (level: string): boolean => {
@@ -37,11 +46,29 @@ export function createLoggingMiddleware(config: SDKConfig): Middleware {
         await next();
 
         const duration = Date.now() - startTime;
-        context.response = {
-          timestamp: Date.now(),
-          duration,
-          metadata: context.response?.metadata,
-        };
+        const timestamp = Date.now();
+        
+        // Create or reuse context.response, preserving existing properties
+        if (!context.response) {
+          context.response = {
+            timestamp,
+            duration,
+          };
+        } else {
+          // Preserve all existing properties and set/overwrite only timestamp and duration
+          const existingMetadata = context.response.metadata;
+          
+          // Merge metadata: shallow-merge existing metadata with any new metadata
+          // Create new metadata object to avoid mutating nested metadata unexpectedly
+          const mergedMetadata = existingMetadata ? { ...existingMetadata } : undefined;
+          
+          context.response = {
+            ...context.response,
+            timestamp,
+            duration,
+            metadata: mergedMetadata,
+          };
+        }
 
         if (shouldLog('info')) {
           console.info(`[Middleware] ${context.request.id} - Request completed`, {

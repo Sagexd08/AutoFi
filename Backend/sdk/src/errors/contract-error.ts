@@ -5,6 +5,7 @@ import { ERROR_CODES } from '../constants/errors';
  * Error thrown when contract-related operations fail.
  */
 export class ContractError extends SDKError {
+  public override readonly name: string = 'ContractError';
   public readonly contractAddress?: string;
   public readonly contractName?: string;
   public readonly operation?: string;
@@ -48,7 +49,6 @@ export class ContractError extends SDKError {
         cause: options.cause,
       }
     );
-    this.name = 'ContractError';
     this.contractAddress = options.contractAddress;
     this.contractName = options.contractName;
     this.operation = options.operation;

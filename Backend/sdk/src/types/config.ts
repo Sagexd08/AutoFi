@@ -15,6 +15,11 @@ export interface SDKConfig {
   readonly timeout?: number;
   readonly retryAttempts?: number;
   readonly retryDelay?: number;
+  readonly metrics?: {
+    readonly rawMetricsEnabled?: boolean;
+    readonly maxRawMetrics?: number;
+    readonly metricsTTL?: number;
+  };
 }
 
 export interface ChainConfig {
@@ -71,22 +76,22 @@ export interface ProxyConfig {
   readonly port: number;
   readonly host: string;
   readonly loadBalancer: LoadBalancerConfig;
-  readonly healthCheck: {
+  readonly healthCheck?: {
     readonly enabled: boolean;
     readonly interval: number;
     readonly timeout: number;
     readonly retries: number;
   };
-  readonly rateLimit: {
+  readonly rateLimit?: {
     readonly enabled: boolean;
     readonly windowMs: number;
     readonly maxRequests: number;
   };
-  readonly cors: {
+  readonly cors?: {
     readonly enabled: boolean;
     readonly origins: readonly string[];
   };
-  readonly authentication: {
+  readonly authentication?: {
     readonly enabled: boolean;
     readonly apiKey?: string;
     readonly jwtSecret?: string;

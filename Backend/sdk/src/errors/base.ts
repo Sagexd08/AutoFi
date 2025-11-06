@@ -1,18 +1,15 @@
 import { ERROR_CODES } from '../constants/errors';
 
-/**
- * Base error class for all SDK errors.
- * Provides error code, context, and recovery information.
- */
+
 export class SDKError extends Error {
+  public override readonly name: string = 'SDKError';
   public readonly code: string;
   public readonly context?: Record<string, unknown>;
   public readonly recoverable: boolean;
   public readonly timestamp: string;
-  public readonly cause?: Error;
+  public override readonly cause?: Error;
 
   /**
-   * Creates a new SDKError instance.
    * 
    * @param code - Error code from ERROR_CODES
    * @param message - Human-readable error message
@@ -31,7 +28,6 @@ export class SDKError extends Error {
     } = {}
   ) {
     super(message);
-    this.name = 'SDKError';
     this.code = code;
     this.context = options.context;
     this.recoverable = options.recoverable ?? false;
@@ -63,14 +59,17 @@ export class SDKError extends Error {
   /**
    * Returns a human-readable error message with context.
    */
-  toString(): string {
+  override toString(): string {
     let message = `[${this.code}] ${this.message}`;
     if (this.context) {
-      message += ` | Context: ${JSON.stringify(this.context)}`;
+      try {
+        message += ` | Context: ${JSON.stringify(this.context)}`;
+      } catch {
+        message += ` | Context: [Unable to stringify]`;
+      }
     }
     if (this.cause) {
       message += ` | Caused by: ${this.cause.message}`;
     }
     return message;
-  }
-}
+  }}

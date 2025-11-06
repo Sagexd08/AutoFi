@@ -6,6 +6,7 @@
  */
 
 export { SDKError } from './base';
+export type { SDKError } from './base';
 export { ChainError } from './chain-error';
 export { ValidationError } from './validation-error';
 export { ContractError } from './contract-error';

@@ -4,11 +4,11 @@ import { DataMasker, type MaskingConfig } from './data-masker';
 
 
 export class ErrorHandler {
-  private static instance: ErrorHandler;
+  private static instance: ErrorHandler | undefined;
   private errorCount: Map<string, number> = new Map();
   private errorHistory: SDKError[] = [];
   private readonly maxHistorySize: number = 1000;
-  private readonly masker: DataMasker;
+  private masker: DataMasker;
   private enableMasking: boolean = true;
 
   constructor(maskingConfig?: MaskingConfig) {
@@ -17,11 +17,11 @@ export class ErrorHandler {
     });
   }
 
-  static getInstance(maskingConfig?: MaskingConfig): ErrorHandler {
+  static getInstance(): ErrorHandler {
     if (!ErrorHandler.instance) {
-      ErrorHandler.instance = new ErrorHandler(maskingConfig);
+      ErrorHandler.instance = new ErrorHandler();
     }
-    return ErrorHandler.instance;
+    return ErrorHandler.instance!;
   }
 
   
@@ -67,14 +67,13 @@ export class ErrorHandler {
   
   private sanitizeSDKError(error: SDKError): SDKError {
     const sanitized = new SDKError(
-      this.masker.sanitizeString(error.message),
       error.code,
+      this.masker.sanitizeString(error.message),
       {
-        ...error.context,
-        ...(error.context && { context: this.masker.maskObject(error.context) }),
-      },
-      error.recoverable,
-      error.timestamp
+        context: error.context ? this.masker.maskObject(error.context) : undefined,
+        recoverable: error.recoverable,
+        cause: error.cause,
+      }
     );
     return sanitized;
   }
@@ -166,7 +165,7 @@ export class ErrorHandler {
   }
 
   
-  updateMaskingConfig(config: Partial<MaskingConfig>): void {
-    this.masker.updateConfig(config);
+  updateMaskingConfig(maskingConfig: MaskingConfig): void {
+    this.masker = new DataMasker(maskingConfig);
   }
 }

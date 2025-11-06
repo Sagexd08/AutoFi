@@ -21,6 +21,11 @@ export const SDKConfigSchema: z.ZodType<SDKConfig> = z.object({
   timeout: z.number().positive('Timeout must be positive').optional(),
   retryAttempts: z.number().int().min(0, 'Retry attempts must be non-negative').optional(),
   retryDelay: z.number().positive('Retry delay must be positive').optional(),
+  metrics: z.object({
+    rawMetricsEnabled: z.boolean().optional(),
+    maxRawMetrics: z.number().int().positive('Max raw metrics must be a positive integer').optional(),
+    metricsTTL: z.number().positive('Metrics TTL must be positive (milliseconds)').optional(),
+  }).optional(),
 }).strict();
 
 /**
@@ -54,8 +59,8 @@ export const AgentConfigSchema: z.ZodType<AgentConfig> = z.object({
   name: z.string().min(1, 'Agent name is required'),
   description: z.string().min(1, 'Agent description is required'),
   capabilities: z.array(z.string()).min(1, 'At least one capability is required'),
-  context: z.record(z.unknown()).optional(),
-  preferences: z.record(z.unknown()).optional(),
+  context: z.record(z.string(), z.unknown()).optional(),
+  preferences: z.record(z.string(), z.unknown()).optional(),
   maxExecutionTime: z.number().positive('Max execution time must be positive').optional(),
   retryAttempts: z.number().int().min(0).optional(),
   enableLogging: z.boolean().optional(),
@@ -99,7 +104,7 @@ export const LoadBalancerConfigSchema: z.ZodType<LoadBalancerConfig> = z.object(
 /**
  * Zod schema for proxy configuration.
  */
-export const ProxyConfigSchema: z.ZodType<ProxyConfig> = z.object({
+export const ProxyConfigSchema = z.object({
   enabled: z.boolean(),
   port: z.number().int().min(1).max(65535),
   host: z.string().min(1),
@@ -109,22 +114,36 @@ export const ProxyConfigSchema: z.ZodType<ProxyConfig> = z.object({
     interval: z.number().positive(),
     timeout: z.number().positive(),
     retries: z.number().int().min(0),
-  }),
+  }).optional(),
   rateLimit: z.object({
     enabled: z.boolean(),
     windowMs: z.number().positive(),
     maxRequests: z.number().int().positive(),
-  }),
+  }).optional(),
   cors: z.object({
     enabled: z.boolean(),
     origins: z.array(z.string()),
-  }),
+  }).optional(),
   authentication: z.object({
     enabled: z.boolean(),
     apiKey: z.string().optional(),
     jwtSecret: z.string().optional(),
-  }),
-}).strict();
+  }).optional(),
+}).strict()
+  .refine(
+    (data) => !data.cors?.enabled || (data.cors && data.cors.origins && data.cors.origins.length > 0),
+    {
+      message: 'When CORS is enabled, at least one origin must be provided',
+      path: ['cors', 'origins'],
+    }
+  )
+  .refine(
+    (data) => !data.authentication?.enabled || (data.authentication && (data.authentication.apiKey || data.authentication.jwtSecret)),
+    {
+      message: 'When authentication is enabled, at least one of apiKey or jwtSecret must be provided',
+      path: ['authentication'],
+    }
+  ) as z.ZodType<ProxyConfig>;
 
 /**
  * Zod schema for test configuration.

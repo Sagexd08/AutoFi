@@ -31,14 +31,14 @@ export class ChainError extends SDKError {
   ) {
     super(ERROR_CODES.CHAIN_NOT_SUPPORTED, message, {
       context: {
+        ...options.context,
         chainId: options.chainId,
         chainName: options.chainName,
-        ...options.context,
       },
       recoverable: options.recoverable ?? true,
       cause: options.cause,
     });
-    this.name = 'ChainError';
+    (this as { name: string }).name = 'ChainError';
     this.chainId = options.chainId;
     this.chainName = options.chainName;
   }

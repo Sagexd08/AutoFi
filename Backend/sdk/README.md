@@ -506,7 +506,7 @@ Encrypted storage for sensitive data:
 ```typescript
 import { SecureStorage } from '@celo-ai/sdk';
 
-const storage = new SecureStorage('encryption-key');
+const storage = new SecureStorage();
 
 // Store encrypted data
 storage.set('apiKey', 'secret-key', 'password');

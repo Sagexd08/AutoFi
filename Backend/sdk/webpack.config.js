@@ -9,7 +9,12 @@ module.exports = {
     path: path.resolve(__dirname, 'dist'),
     filename: '[name].bundle.js',
     library: {
-      name: 'CeloAISDK',
+      name: (entryData) => {
+        // Generate unique library name based on entry point
+        const entryName = entryData.chunk.name;
+        const capitalizedName = entryName.charAt(0).toUpperCase() + entryName.slice(1);
+        return `CeloAISDK${capitalizedName}`;
+      },
       type: 'umd',
       export: 'default',
     },
@@ -23,23 +28,13 @@ module.exports = {
     rules: [
       {
         test: /\.tsx?$/,
-        use: [
-          {
-            loader: 'babel-loader',
-            options: {
-              presets: [
-                ['@babel/preset-env', { targets: { node: '18' } }],
-                '@babel/preset-typescript',
-              ],
-            },
+        use: {
+          loader: 'ts-loader',
+          options: {
+            configFile: 'tsconfig.json',
+            transpileOnly: false, // Enable type checking during build
           },
-          {
-            loader: 'ts-loader',
-            options: {
-              configFile: 'tsconfig.json',
-            },
-          },
-        ],
+        },
         exclude: /node_modules/,
       },
     ],
@@ -49,7 +44,6 @@ module.exports = {
   },
   optimization: {
     minimize: true,
-    sideEffects: false,
   },
   mode: 'production',
   devtool: 'source-map',

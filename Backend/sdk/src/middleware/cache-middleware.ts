@@ -30,15 +30,17 @@ export function createCacheMiddleware(config: CacheMiddlewareConfig): Middleware
     },
     execute: async (context: MiddlewareContext, next: () => Promise<void>): Promise<void> => {
       const cacheKey = config.getCacheKey(context);
-      const cached = await config.cache.get(cacheKey);
+      const cached = await config.cache.get<MiddlewareContext['response']>(cacheKey);
 
       if (cached !== undefined) {
-        if (context.response) {
-          context.response.metadata = {
-            ...context.response.metadata,
+        // Create shallow copies to avoid mutating the cached object
+        context.response = {
+          ...cached,
+          metadata: {
+            ...(cached.metadata || {}),
             cached: true,
-          };
-        }
+          },
+        };
         return;
       }
 

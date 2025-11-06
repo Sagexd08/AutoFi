@@ -28,12 +28,9 @@ export class MemoryCache implements CacheInterface {
   private startCleanup(interval: number): void {
     this.cleanupInterval = setInterval(() => {
       this.cleanup();
-    }, interval);
+    }, interval).unref();
   }
 
-  /**
-   * Cleans up expired entries.
-   */
   private cleanup(): void {
     const now = Date.now();
     for (const [key, entry] of this.cache.entries()) {

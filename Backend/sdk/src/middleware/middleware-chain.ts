@@ -1,10 +1,16 @@
 import type { Middleware, MiddlewareContext, MiddlewareFunction } from './types';
 
 /**
+ * Internal type for middleware with insertion tracking.
+ */
+type MiddlewareWithInsertion = Middleware & { _insertionIndex?: number };
+
+/**
  * Middleware chain for executing middleware in order.
  */
 export class MiddlewareChain {
-  private middlewares: Middleware[] = [];
+  private middlewares: MiddlewareWithInsertion[] = [];
+  private insertionCounter = 0;
 
   /**
    * Adds a middleware to the chain.
@@ -12,7 +18,7 @@ export class MiddlewareChain {
    * @param middleware - Middleware to add
    */
   add(middleware: Middleware): void {
-    this.middlewares.push(middleware);
+    this.middlewares.push({ ...middleware, _insertionIndex: this.insertionCounter++ });
     // Sort by order (lower numbers first), then by insertion order
     this.middlewares.sort((a, b) => {
       const orderA = a.config.order ?? 100;
@@ -20,7 +26,7 @@ export class MiddlewareChain {
       if (orderA !== orderB) {
         return orderA - orderB;
       }
-      return 0;
+      return (a._insertionIndex ?? 0) - (b._insertionIndex ?? 0);
     });
   }
 
@@ -69,12 +75,13 @@ export class MiddlewareChain {
    */
   clear(): void {
     this.middlewares = [];
+    this.insertionCounter = 0;
   }
 
   /**
    * Gets all registered middlewares.
    */
   getMiddlewares(): readonly Middleware[] {
-    return [...this.middlewares];
+    return this.middlewares.map(({ _insertionIndex, ...middleware }) => middleware);
   }
 }

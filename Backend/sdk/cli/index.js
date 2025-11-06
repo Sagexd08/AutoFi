@@ -6,6 +6,8 @@ import { Command } from 'commander';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import readline from 'readline/promises';
+import { stdin as input, stdout as output } from 'process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,6 +58,148 @@ async function loadConfig() {
 }
 
 
+async function compileSolidity(sourceCode, contractName) {
+  try {
+    // Try to import solc dynamically
+    const solc = await import('solc').catch(() => {
+      throw new Error('solc package not found. Please install it: npm install solc');
+    });
+    
+    const solcModule = solc.default || solc;
+    
+    // Try to detect Solidity version from pragma statement
+    let compilerVersion = '0.8.20'; // Default version
+    const pragmaMatch = sourceCode.match(/pragma\s+solidity\s+([\^>=<]?\d+\.\d+\.\d+)/);
+    if (pragmaMatch) {
+      // Extract version, handle version ranges
+      const versionStr = pragmaMatch[1].replace(/[\^>=<]/g, '');
+      const versionParts = versionStr.split('.');
+      if (versionParts.length >= 2) {
+        compilerVersion = `${versionParts[0]}.${versionParts[1]}.0`;
+      }
+    }
+    
+    // Load the compiler version - handle different solc-js API versions
+    let compiler;
+    try {
+      // Try newer API first (solc-js >= 0.8.0)
+      if (typeof solcModule.setupMethods === 'object' && solcModule.setupMethods.solidity) {
+        compiler = await solcModule.setupMethods.solidity.loadRemoteVersion(compilerVersion);
+      } 
+      // Try older API (solc-js < 0.8.0)
+      else if (typeof solcModule.loadRemoteVersion === 'function') {
+        compiler = await solcModule.loadRemoteVersion(compilerVersion);
+      }
+      // Fallback to default compiler if available
+      else if (typeof solcModule.compile === 'function') {
+        compiler = solcModule;
+      } else {
+        throw new Error('Unable to initialize Solidity compiler. Please ensure solc is properly installed.');
+      }
+    } catch (loadError) {
+      // If remote loading fails, try to use the default compiler
+      if (typeof solcModule.compile === 'function') {
+        compiler = solcModule;
+      } else {
+        throw new Error(`Failed to load Solidity compiler version ${compilerVersion}: ${loadError.message}`);
+      }
+    }
+    
+    // Extract contract name from source if not provided
+    let actualContractName = contractName;
+    if (!actualContractName) {
+      const contractMatch = sourceCode.match(/contract\s+(\w+)/);
+      if (contractMatch) {
+        actualContractName = contractMatch[1];
+      } else {
+        throw new Error('Could not determine contract name. Please specify it with --name option.');
+      }
+    }
+    
+    // Prepare input for solc compiler (standard JSON input format)
+    const input = {
+      language: 'Solidity',
+      sources: {
+        'contract.sol': {
+          content: sourceCode,
+        },
+      },
+      settings: {
+        outputSelection: {
+          '*': {
+            '*': ['abi', 'evm.bytecode'],
+          },
+        },
+        optimizer: {
+          enabled: false,
+          runs: 200,
+        },
+      },
+    };
+    
+    // Compile the contract
+    const inputJSON = JSON.stringify(input);
+    let compileOutput;
+    
+    if (typeof compiler.compile === 'function') {
+      compileOutput = compiler.compile(inputJSON);
+    } else {
+      throw new Error('Compiler does not have a compile method');
+    }
+    
+    const output = typeof compileOutput === 'string' ? JSON.parse(compileOutput) : compileOutput;
+    
+    // Check for compilation errors
+    if (output.errors && Array.isArray(output.errors)) {
+      const errors = output.errors.filter(
+        (error) => error.severity === 'error'
+      );
+      if (errors.length > 0) {
+        const errorMessages = errors.map((e) => {
+          if (e.formattedMessage) return e.formattedMessage;
+          if (e.message) return e.message;
+          return JSON.stringify(e);
+        }).join('\n');
+        throw new Error(`Compilation errors:\n${errorMessages}`);
+      }
+    }
+    
+    // Extract ABI and bytecode
+    const contracts = output.contracts?.['contract.sol'];
+    if (!contracts) {
+      throw new Error('No contracts found in compilation output. Check for compilation errors.');
+    }
+    
+    if (!contracts[actualContractName]) {
+      const availableContracts = Object.keys(contracts).join(', ');
+      throw new Error(`Contract "${actualContractName}" not found in compiled output. Available contracts: ${availableContracts || 'none'}`);
+    }
+    
+    const contract = contracts[actualContractName];
+    const abi = contract.abi;
+    const bytecode = contract.evm?.bytecode?.object || contract.evm?.bytecode || '';
+    
+    if (!abi) {
+      throw new Error('Failed to extract ABI from compilation output.');
+    }
+    
+    if (!bytecode || bytecode === '0x') {
+      throw new Error('Failed to extract bytecode from compilation output. Contract may be abstract or an interface.');
+    }
+    
+    return {
+      abi,
+      bytecode: bytecode.startsWith('0x') ? bytecode : `0x${bytecode}`,
+    };
+  } catch (error) {
+    if (error.message.includes('solc package not found')) {
+      throw error;
+    }
+    throw new Error(`Solidity compilation failed: ${error.message}`);
+  }
+}
+
+
 program
   .command('init')
   .description('Initialize SDK configuration')
@@ -73,8 +217,88 @@ program
         logLevel: 'info',
       };
 
-      await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+      // Write config file with restrictive permissions (0o600 = owner read/write only)
+      const configContent = JSON.stringify(config, null, 2);
+      
+      // Create file with restrictive permissions using fs.open with mode 0o600
+      let fileHandle;
+      try {
+        fileHandle = await fs.open(configPath, 'wx', 0o600); // 'wx' = write exclusive, fails if exists
+      } catch (openError) {
+        // If file exists, try opening with 'w' mode
+        if (openError.code === 'EEXIST') {
+          fileHandle = await fs.open(configPath, 'w', 0o600);
+        } else {
+          throw openError;
+        }
+      }
+      
+      try {
+        // Write content to file using fileHandle.write
+        const buffer = Buffer.from(configContent, 'utf-8');
+        await fileHandle.write(buffer, 0, buffer.length);
+      } catch (writeError) {
+        await fileHandle.close().catch(() => {});
+        console.error('❌ Failed to write configuration file:', writeError.message);
+        process.exit(1);
+      } finally {
+        await fileHandle.close();
+      }
+      
+      // Ensure permissions are set correctly (important for some systems)
+      try {
+        await fs.chmod(configPath, 0o600);
+      } catch (chmodError) {
+        console.error('❌ Failed to set restrictive file permissions:', chmodError.message);
+        console.error('   The configuration file was created but may not be properly secured.');
+        console.error('   Please manually set file permissions to owner read/write only (chmod 600).');
+        await fs.unlink(configPath).catch(() => {}); // Clean up on failure
+        process.exit(1);
+      }
+
       console.log('✅ Configuration file created at:', configPath);
+      
+      // Security warning
+      console.log('\n⚠️  SECURITY WARNING:');
+      console.log('   This file contains sensitive private keys and API credentials.');
+      console.log('   Keep this file secure and never commit it to version control.');
+      console.log('   File permissions have been set to owner read/write only (600).');
+
+      // Ensure .gitignore includes the config file
+      const gitignorePath = path.join(process.cwd(), '.gitignore');
+      const configFileName = '.celo-ai.config.json';
+      
+      try {
+        let gitignoreContent = '';
+        try {
+          gitignoreContent = await fs.readFile(gitignorePath, 'utf-8');
+        } catch {
+          // .gitignore doesn't exist, we'll create it
+        }
+
+        // Check if config file is already in .gitignore
+        const ignorePatterns = gitignoreContent.split('\n').map(line => line.trim());
+        const isIgnored = ignorePatterns.some(pattern => {
+          if (!pattern || pattern.startsWith('#')) return false;
+          return pattern === configFileName || 
+                 pattern === `/${configFileName}` ||
+                 pattern.endsWith(configFileName);
+        });
+
+        if (!isIgnored) {
+          // Add to .gitignore
+          const separator = gitignoreContent && !gitignoreContent.endsWith('\n') ? '\n' : '';
+          const newEntry = `${separator}# Celo AI SDK configuration (contains sensitive keys)\n${configFileName}\n`;
+          await fs.appendFile(gitignorePath, newEntry);
+          console.log(`\n✅ Added ${configFileName} to .gitignore`);
+        } else {
+          console.log(`\n✅ ${configFileName} is already in .gitignore`);
+        }
+      } catch (gitignoreError) {
+        console.warn(`\n⚠️  Warning: Could not update .gitignore: ${gitignoreError.message}`);
+        console.warn(`   Please manually add "${configFileName}" to your .gitignore file`);
+        console.warn(`   to prevent accidentally committing sensitive credentials.`);
+      }
     } catch (error) {
       console.error('❌ Failed to initialize configuration:', error.message);
       process.exit(1);
@@ -213,8 +437,14 @@ agentCmd
       if (response.reasoning) {
         console.log(`   Reasoning: ${response.reasoning}`);
       }
-      console.log(`   Confidence: ${(response.confidence * 100).toFixed(2)}%`);
-      console.log(`   Execution Time: ${response.executionTime}ms`);
+      const confidenceValue = (typeof response.confidence === 'number' && Number.isFinite(response.confidence))
+        ? `${(response.confidence * 100).toFixed(2)}%`
+        : 'N/A';
+      console.log(`   Confidence: ${confidenceValue}`);
+      const executionTimeValue = (typeof response.executionTime === 'number' && Number.isFinite(response.executionTime))
+        ? `${response.executionTime}ms`
+        : 'N/A';
+      console.log(`   Execution Time: ${executionTimeValue}`);
     } catch (error) {
       console.error('❌ Failed to query agent:', error.message);
       process.exit(1);
@@ -235,6 +465,76 @@ txCmd
   .option('-c, --chain <chain>', 'Chain ID')
   .action(async (options) => {
     try {
+      // Validate recipient address
+      const addressPattern = /^0x[a-fA-F0-9]{40}$/;
+      if (!addressPattern.test(options.to)) {
+        console.error('❌ Invalid recipient address format.');
+        console.error('   Expected format: 0x followed by 40 hexadecimal characters');
+        console.error(`   Received: ${options.to}`);
+        process.exit(1);
+      }
+
+      // Validate value if provided
+      if (options.value !== undefined && options.value !== null) {
+        const valueStr = String(options.value).trim();
+        if (valueStr === '' || isNaN(valueStr)) {
+          console.error('❌ Invalid value format.');
+          console.error('   Value must be a valid numeric string that can be safely parsed.');
+          console.error(`   Received: ${options.value}`);
+          process.exit(1);
+        }
+
+        // Check if it can be safely parsed to BigInt (for wei values)
+        try {
+          BigInt(valueStr);
+        } catch (bigIntError) {
+          console.error('❌ Invalid value format.');
+          console.error('   Value must be a valid number that can be safely parsed to BigInt.');
+          console.error(`   Received: ${options.value}`);
+          console.error(`   Error: ${bigIntError.message}`);
+          process.exit(1);
+        }
+
+        // Also check if it can be parsed as a number (for additional validation)
+        const numValue = Number(valueStr);
+        if (!Number.isFinite(numValue) || numValue < 0) {
+          console.error('❌ Invalid value format.');
+          console.error('   Value must be a finite, non-negative number.');
+          console.error(`   Received: ${options.value}`);
+          process.exit(1);
+        }
+      }
+
+      // Display transaction details for confirmation
+      console.log('\n📋 Transaction Details:');
+      console.log(`   To: ${options.to}`);
+      if (options.value !== undefined && options.value !== null) {
+        console.log(`   Value: ${options.value} wei`);
+      }
+      if (options.data !== undefined && options.data !== null) {
+        console.log(`   Data: ${options.data}`);
+      }
+      if (options.chain !== undefined && options.chain !== null) {
+        console.log(`   Chain: ${options.chain}`);
+      } else {
+        console.log(`   Chain: (default)`);
+      }
+
+      // Interactive confirmation prompt
+      const rl = readline.createInterface({ input, output });
+      try {
+        await rl.question('\n⚠️  Press Enter to confirm and send the transaction (Ctrl+C to cancel): ');
+        rl.close();
+      } catch (promptError) {
+        rl.close();
+        // If user presses Ctrl+C, readline throws an error
+        if (promptError.code === 'SIGINT' || promptError.name === 'AbortError') {
+          console.log('\n\n❌ Transaction cancelled by user.');
+          process.exit(1);
+        }
+        throw promptError;
+      }
+
       const config = await loadConfig();
       const CeloAISDK = await getSDK();
       const sdk = new CeloAISDK(config);
@@ -280,15 +580,44 @@ contractCmd
   .option('-c, --chain <chain>', 'Chain ID')
   .action(async (options) => {
     try {
+      // Read and validate source file
+      let source;
+      try {
+        source = await fs.readFile(options.source, 'utf-8');
+      } catch (fileError) {
+        console.error('❌ Failed to read source file.');
+        console.error(`   File: ${options.source}`);
+        console.error(`   Error: ${fileError.message}`);
+        process.exit(1);
+      }
+
+      if (!source || source.trim().length === 0) {
+        console.error('❌ Source file is empty.');
+        console.error(`   File: ${options.source}`);
+        process.exit(1);
+      }
+
+      // Compile the contract
+      console.log('\n🔨 Compiling contract...');
+      let abi, bytecode;
+      try {
+        const compilation = await compileSolidity(source, options.name);
+        abi = compilation.abi;
+        bytecode = compilation.bytecode;
+        console.log('✅ Compilation successful');
+      } catch (compileError) {
+        console.error('❌ Contract compilation failed.');
+        console.error(`   ${compileError.message}`);
+        if (compileError.message.includes('solc package not found')) {
+          console.error('\n   To fix this, run: npm install solc');
+        }
+        process.exit(1);
+      }
+
       const config = await loadConfig();
       const CeloAISDK = await getSDK();
       const sdk = new CeloAISDK(config);
       await sdk.initialize();
-
-      const source = await fs.readFile(options.source, 'utf-8');
-      
-      const abi = []; 
-      const bytecode = '0x'; 
 
       console.log('\n📦 Deploying contract...');
       const deployment = await sdk.deployContract(

@@ -33,11 +33,40 @@ export interface MetricsCollector {
 }
 
 
+export interface MetricsConfig {
+  rawMetricsEnabled?: boolean;
+  maxRawMetrics?: number;
+  metricsTTL?: number;
+}
+
+interface InternalMetricsConfig {
+  rawMetricsEnabled: boolean;
+  maxRawMetrics?: number;
+  metricsTTL?: number;
+}
+
 export class InMemoryMetricsCollector implements MetricsCollector {
   private metrics: MetricValue[] = [];
   private counters = new Map<string, number>();
   private gauges = new Map<string, number>();
   private histograms = new Map<string, number[]>();
+  private readonly config: InternalMetricsConfig;
+  private ttlCleanupInterval?: NodeJS.Timeout;
+
+  constructor(config: MetricsConfig = {}) {
+    this.config = {
+      rawMetricsEnabled: config.rawMetricsEnabled ?? true,
+      maxRawMetrics: config.maxRawMetrics,
+      metricsTTL: config.metricsTTL,
+    };
+
+    if (this.config.metricsTTL && this.config.metricsTTL > 0) {
+      const cleanupInterval = Math.min(this.config.metricsTTL / 2, 60000);
+      this.ttlCleanupInterval = setInterval(() => {
+        this.purgeExpiredMetrics();
+      }, cleanupInterval);
+    }
+  }
 
   
   increment(name: string, labels?: Record<string, string>): void {
@@ -45,13 +74,15 @@ export class InMemoryMetricsCollector implements MetricsCollector {
     const current = this.counters.get(key) ?? 0;
     this.counters.set(key, current + 1);
 
-    this.metrics.push({
-      type: MetricType.COUNTER,
-      name,
-      value: current + 1,
-      labels,
-      timestamp: Date.now(),
-    });
+    if (this.config.rawMetricsEnabled) {
+      this.addMetric({
+        type: MetricType.COUNTER,
+        name,
+        value: current + 1,
+        labels,
+        timestamp: Date.now(),
+      });
+    }
   }
 
   
@@ -59,13 +90,15 @@ export class InMemoryMetricsCollector implements MetricsCollector {
     const key = this.getKey(name, labels);
     this.gauges.set(key, value);
 
-    this.metrics.push({
-      type: MetricType.GAUGE,
-      name,
-      value,
-      labels,
-      timestamp: Date.now(),
-    });
+    if (this.config.rawMetricsEnabled) {
+      this.addMetric({
+        type: MetricType.GAUGE,
+        name,
+        value,
+        labels,
+        timestamp: Date.now(),
+      });
+    }
   }
 
   
@@ -75,13 +108,15 @@ export class InMemoryMetricsCollector implements MetricsCollector {
     values.push(value);
     this.histograms.set(key, values);
 
-    this.metrics.push({
-      type: MetricType.HISTOGRAM,
-      name,
-      value,
-      labels,
-      timestamp: Date.now(),
-    });
+    if (this.config.rawMetricsEnabled) {
+      this.addMetric({
+        type: MetricType.HISTOGRAM,
+        name,
+        value,
+        labels,
+        timestamp: Date.now(),
+      });
+    }
   }
 
   
@@ -122,11 +157,13 @@ export class InMemoryMetricsCollector implements MetricsCollector {
     }
 
     const sum = values.reduce((a, b) => a + b, 0);
+    const min = values.reduce((a, b) => Math.min(a, b), Infinity);
+    const max = values.reduce((a, b) => Math.max(a, b), -Infinity);
     return {
       count: values.length,
       sum,
-      min: Math.min(...values),
-      max: Math.max(...values),
+      min,
+      max,
       avg: sum / values.length,
     };
   }
@@ -137,6 +174,50 @@ export class InMemoryMetricsCollector implements MetricsCollector {
     this.counters.clear();
     this.gauges.clear();
     this.histograms.clear();
+  }
+
+  destroy(): void {
+    if (this.ttlCleanupInterval) {
+      clearInterval(this.ttlCleanupInterval);
+      this.ttlCleanupInterval = undefined;
+    }
+  }
+
+  private addMetric(metric: MetricValue): void {
+    if (!this.config.rawMetricsEnabled) {
+      return;
+    }
+
+    this.metrics.push(metric);
+
+    if (this.config.maxRawMetrics && this.config.maxRawMetrics > 0) {
+      while (this.metrics.length > this.config.maxRawMetrics) {
+        this.metrics.shift();
+      }
+    }
+  }
+
+  private purgeExpiredMetrics(): void {
+    if (!this.config.metricsTTL || this.config.metricsTTL <= 0) {
+      return;
+    }
+
+    const now = Date.now();
+    const cutoff = now - this.config.metricsTTL;
+    
+    let i = 0;
+    while (i < this.metrics.length) {
+      const metric = this.metrics[i];
+      if (metric && metric.timestamp < cutoff) {
+        i++;
+      } else {
+        break;
+      }
+    }
+
+    if (i > 0) {
+      this.metrics = this.metrics.slice(i);
+    }
   }
 
   

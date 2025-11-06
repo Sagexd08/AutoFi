@@ -28,7 +28,25 @@ export function createRetryMiddleware(config: RetryMiddlewareConfig): Middleware
     execute: async (context: MiddlewareContext, next: () => Promise<void>): Promise<void> => {
       const shouldRetry = config.shouldRetry ?? (() => true);
 
-      if (!shouldRetry(context)) {
+      let shouldRetryResult: boolean;
+      try {
+        shouldRetryResult = shouldRetry(context);
+      } catch (error) {
+        console.error('[RetryMiddleware] Error in shouldRetry callback', {
+          requestId: context.request.id,
+          path: context.request.path,
+          error: error instanceof Error ? error.message : String(error),
+          context: {
+            request: context.request,
+            response: context.response,
+            error: context.error,
+          },
+        });
+        // Default to true to allow retries on error (safe default)
+        shouldRetryResult = true;
+      }
+
+      if (!shouldRetryResult) {
         await next();
         return;
       }

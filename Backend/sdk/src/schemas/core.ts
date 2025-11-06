@@ -14,7 +14,7 @@ export const TransactionHashSchema = z.string().regex(/^0x[a-fA-F0-9]{64}$/, 'In
 /**
  * Hex string validation schema.
  */
-export const HexStringSchema = z.string().regex(/^0x[a-fA-F0-9]+$/, 'Invalid hex string format');
+export const HexStringSchema = z.string().regex(/^0x([a-fA-F0-9]{2})+$/, 'Invalid hex string format: must start with 0x followed by an even number of hex characters (byte pairs)');
 
 /**
  * Number string validation schema (for wei amounts).
@@ -40,7 +40,68 @@ export const TransactionRequestSchema: z.ZodType<TransactionRequest> = z.object(
   nonce: z.number().int().nonnegative().optional(),
   chainId: z.number().int().positive().optional(),
   type: z.enum(['legacy', 'eip1559']).optional(),
-}).strict();
+}).strict().superRefine((data, ctx) => {
+  const { type, gasPrice, maxFeePerGas, maxPriorityFeePerGas } = data;
+
+  // If type is 'legacy', maxFeePerGas and maxPriorityFeePerGas must not be present
+  if (type === 'legacy') {
+    if (maxFeePerGas !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'maxFeePerGas cannot be used with legacy transaction type. Use gasPrice instead.',
+        path: ['maxFeePerGas'],
+      });
+    }
+    if (maxPriorityFeePerGas !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'maxPriorityFeePerGas cannot be used with legacy transaction type. Use gasPrice instead.',
+        path: ['maxPriorityFeePerGas'],
+      });
+    }
+  }
+
+  // If type is 'eip1559', gasPrice must not be present
+  if (type === 'eip1559') {
+    if (gasPrice !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'gasPrice cannot be used with EIP-1559 transaction type. Use maxFeePerGas and maxPriorityFeePerGas instead.',
+        path: ['gasPrice'],
+      });
+    }
+  }
+
+  // If type is unspecified, ensure mutual exclusivity
+  if (type === undefined) {
+    const hasLegacyGas = gasPrice !== undefined;
+    const hasEip1559Gas = maxFeePerGas !== undefined || maxPriorityFeePerGas !== undefined;
+
+    if (hasLegacyGas && hasEip1559Gas) {
+      if (gasPrice !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'gasPrice cannot be used together with maxFeePerGas or maxPriorityFeePerGas. These gas pricing methods are mutually exclusive.',
+          path: ['gasPrice'],
+        });
+      }
+      if (maxFeePerGas !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'maxFeePerGas cannot be used together with gasPrice. These gas pricing methods are mutually exclusive.',
+          path: ['maxFeePerGas'],
+        });
+      }
+      if (maxPriorityFeePerGas !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'maxPriorityFeePerGas cannot be used together with gasPrice. These gas pricing methods are mutually exclusive.',
+          path: ['maxPriorityFeePerGas'],
+        });
+      }
+    }
+  }
+});
 
 /**
  * Zod schema for transaction response.
