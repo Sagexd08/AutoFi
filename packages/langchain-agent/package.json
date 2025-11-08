@@ -26,7 +26,6 @@
     "@celo-automator/celo-functions": "workspace:*",
     "@langchain/core": "^0.3.0",
     "@langchain/google-genai": "^0.0.24",
-    "@langchain/openai": "^0.3.0",
     "langchain": "^0.3.0",
     "zod": "^3.22.4"
   },

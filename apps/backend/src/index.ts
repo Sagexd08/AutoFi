@@ -4,11 +4,19 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { workflowRoutes } from './routes/workflows.js';
+import { agentRoutes } from './routes/agents.js';
+import { deployRoutes } from './routes/deploy.js';
+import { txRoutes } from './routes/tx.js';
+import { limitsRoutes } from './routes/limits.js';
+import { chainsRoutes } from './routes/chains.js';
 import { walletRoutes } from './routes/wallet.js';
 import { eventRoutes } from './routes/events.js';
 import { healthRoutes } from './routes/health.js';
 import { logger } from './utils/logger.js';
 import { sanitizeErrorForLogging, generateErrorCode } from './utils/error-sanitizer.js';
+import { setupSwagger } from './utils/swagger.js';
+import { setupMetricsRoute } from './middleware/metrics-route.js';
+import { auditMiddleware } from './middleware/audit.js';
 
 dotenv.config();
 
@@ -24,11 +32,20 @@ const limiter = rateLimit({
   max: 100,
 });
 app.use('/api/', limiter);
+app.use(auditMiddleware);
 
 app.use('/api/workflows', workflowRoutes);
+app.use('/api/agents', agentRoutes);
+app.use('/api/deploy', deployRoutes);
+app.use('/api/tx', txRoutes);
+app.use('/api/limits', limitsRoutes);
+app.use('/api/chains', chainsRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/health', healthRoutes);
+
+setupSwagger(app);
+setupMetricsRoute(app);
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const errorCode = generateErrorCode();

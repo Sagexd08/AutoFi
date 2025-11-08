@@ -8,6 +8,10 @@ import { workflowCommand } from './commands/workflow.js';
 import { watchCommand } from './commands/watch.js';
 import { explainCommand } from './commands/explain.js';
 import { configCommand } from './commands/config.js';
+import { agentCommand } from './commands/agent.js';
+import { txCommand } from './commands/tx.js';
+import { chainCommand } from './commands/chain.js';
+import { limitsCommand } from './commands/limits.js';
 
 const program = new Command();
 
@@ -96,6 +100,60 @@ program
   .option('-l, --list', 'List all configuration')
   .action(async (options) => {
     await configCommand(options);
+  });
+
+program
+  .command('agent')
+  .description('Manage AI agents')
+  .option('-c, --create', 'Create a new agent')
+  .option('-l, --list', 'List all agents')
+  .option('-q, --query <agentId>', 'Query an agent with a prompt')
+  .option('-t, --type <type>', 'Agent type (treasury, defi, nft, governance, donation)')
+  .option('-n, --name <name>', 'Agent name')
+  .option('-d, --description <description>', 'Agent description')
+  .option('-p, --prompt <prompt>', 'Prompt for query')
+  .option('--json', 'Output as JSON')
+  .action(async (options) => {
+    await agentCommand(options, program);
+  });
+
+program
+  .command('tx')
+  .description('Transaction management')
+  .option('-s, --send', 'Send a transaction')
+  .option('-e, --estimate', 'Estimate gas for a transaction')
+  .option('--to <address>', 'Recipient address')
+  .option('--value <value>', 'Transaction value')
+  .option('--data <data>', 'Transaction data')
+  .option('--agent-id <agentId>', 'Agent ID')
+  .option('--simulate', 'Simulate only')
+  .option('--json', 'Output as JSON')
+  .action(async (options) => {
+    await txCommand(options, program);
+  });
+
+program
+  .command('chain')
+  .description('Chain health monitoring')
+  .option('-h, --health', 'Check chain health')
+  .option('--chain-id <chainId>', 'Specific chain ID to check')
+  .option('--json', 'Output as JSON')
+  .action(async (options) => {
+    await chainCommand(options, program);
+  });
+
+program
+  .command('limits')
+  .description('Spending limit management')
+  .option('-s, --set', 'Set spending limits')
+  .option('-g, --get <agentId>', 'Get spending limits for an agent')
+  .option('--agent-id <agentId>', 'Agent ID')
+  .option('--daily <limit>', 'Daily limit')
+  .option('--per-tx <limit>', 'Per-transaction limit')
+  .option('--currency <currency>', 'Currency')
+  .option('--json', 'Output as JSON')
+  .action(async (options) => {
+    await limitsCommand(options, program);
   });
 
 program.parse();

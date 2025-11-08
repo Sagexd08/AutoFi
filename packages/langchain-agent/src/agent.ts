@@ -1,5 +1,4 @@
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
-import { ChatOpenAI } from '@langchain/openai';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { AgentConfig } from '@celo-automator/types';
 import { BufferMemory } from './memory.js';
@@ -8,7 +7,6 @@ import type { CeloClient } from '@celo-automator/celo-functions';
 
 export interface LangChainAgentConfig extends AgentConfig {
   geminiApiKey?: string;
-  openaiApiKey?: string;
   celoClient?: CeloClient;
 }
 
@@ -36,18 +34,8 @@ export class LangChainAgent {
         temperature: config.temperature || 0.7,
         maxOutputTokens: config.maxTokens || 2000,
       }) as unknown as BaseChatModel;
-    } else if (config.model.startsWith('gpt')) {
-      if (!config.openaiApiKey && !process.env.OPENAI_API_KEY) {
-        throw new Error('OpenAI API key is required for GPT models');
-      }
-      return new ChatOpenAI({
-        model: config.model,
-        apiKey: config.openaiApiKey || process.env.OPENAI_API_KEY,
-        temperature: config.temperature || 0.7,
-        maxTokens: config.maxTokens || 2000,
-      });
     } else {
-      throw new Error(`Unsupported model: ${config.model}`);
+      throw new Error(`Unsupported model: ${config.model}. Only Gemini models are supported.`);
     }
   }
 

@@ -4,7 +4,7 @@ TypeScript library for building AI-powered autonomous agents on the Celo blockch
 
 ## Features
 
-- 🤖 **AI-Powered Agents**: Intelligent decision-making with OpenAI/Claude integration
+- 🤖 **AI-Powered Agents**: Intelligent decision-making with Google Gemini integration
 - 🔒 **Transaction Security**: Alchemy-powered security analysis and risk assessment
 - 🎨 **NFT Operations**: Secure NFT minting, metadata management, and transfers
 - 🏦 **DeFi Integration**: Treasury management, donation splitting, yield optimization

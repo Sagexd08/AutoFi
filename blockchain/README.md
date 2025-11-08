@@ -4,7 +4,7 @@ A comprehensive TypeScript library for building AI-powered autonomous agents on 
 
 ## 🚀 Features
 
-- **AI-Powered Decision Making**: Uses OpenAI GPT-4 or Anthropic Claude for intelligent decision-making
+- **AI-Powered Decision Making**: Uses Google Gemini for intelligent decision-making
 - **Pre-built Agent Templates**: Treasury Manager, Donation Splitter, Yield Optimizer, NFT Minter, Governance Participant
 - **Celo Blockchain Integration**: Full support for Celo mainnet and Alfajores testnet
 - **Safety & Validation**: Built-in spending limits, whitelist/blacklist, and risk assessment
@@ -276,7 +276,7 @@ console.log('Contract deployed:', result.data.contractAddress);
 
 1. **Configure Credentials**:
    - Celo Wallet: Private key, network, contract addresses
-   - OpenAI: API key, model selection
+   - Gemini: API key, model selection
 
 2. **Create Agent Node**:
    - Drag the desired agent node into your workflow

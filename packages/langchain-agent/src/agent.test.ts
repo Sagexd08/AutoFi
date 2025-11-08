@@ -36,7 +36,7 @@ describe('LangChainAgent', () => {
     }).toThrow('Gemini API key is required');
   });
 
-  it('should throw error when OpenAI API key is missing for GPT models', () => {
+  it('should throw error for unsupported models', () => {
     expect(() => {
       new LangChainAgent({
         id: 'test-agent',
@@ -45,7 +45,7 @@ describe('LangChainAgent', () => {
         model: 'gpt-4',
         celoClient,
       });
-    }).toThrow('OpenAI API key is required');
+    }).toThrow('Unsupported model');
   });
 
   it('should have getTools method', () => {

@@ -131,7 +131,6 @@ CELO_RPC_URL=https://alfajores-forno.celo-testnet.org
 
 # AI Configuration
 GEMINI_API_KEY=your_gemini_key
-OPENAI_API_KEY=your_openai_key
 
 # Server Configuration
 PORT=3000

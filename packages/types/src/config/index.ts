@@ -1,6 +1,5 @@
 export interface AutomatorConfig {
   geminiApiKey?: string;
-  openaiApiKey?: string;
   langchainApiKey?: string;
   celoPrivateKey?: string;
   network: 'alfajores' | 'mainnet' | 'baklava';
