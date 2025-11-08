@@ -669,7 +669,7 @@ export class TokenManager {
   /**
    * Validate token and return payload
    */
-  validateToken(token: string): Record<string, unknown> | null {
+  async validateToken(token: string): Promise<Record<string, unknown> | null> {
     if (typeof token !== 'string' || token.length !== 64) {
       return null;
     }
@@ -678,16 +678,15 @@ export class TokenManager {
 
     // Try to load from storage if not in memory
     if (!tokenInfo && this.storageBackend) {
-      this.storageBackend.get(token)
-        .then((info) => {
-          if (info) {
-            this.tokens.set(token, info);
-            tokenInfo = info;
-          }
-        })
-        .catch((error) => {
-          this.logger?.error('Failed to load token from storage', { error });
-        });
+      try {
+        const info = await this.storageBackend.get(token);
+        if (info) {
+          this.tokens.set(token, info);
+          tokenInfo = info;
+        }
+      } catch (error) {
+        this.logger?.error('Failed to load token from storage', { error });
+      }
     }
 
     if (!tokenInfo) {
@@ -710,9 +709,11 @@ export class TokenManager {
 
     // Update in storage if available
     if (this.storageBackend) {
-      this.storageBackend.set(token, tokenInfo).catch((error) => {
+      try {
+        await this.storageBackend.set(token, tokenInfo);
+      } catch (error) {
         this.logger?.error('Failed to update token in storage', { error });
-      });
+      }
     }
 
     return tokenInfo.payload;
@@ -818,9 +819,7 @@ export class TokenManager {
     };
   }
 
-  /**
-   * Cleanup and destroy
-   */
+  
   destroy(): void {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
@@ -939,7 +938,7 @@ export class SecureStorage {
   /**
    * Get a value with decryption
    */
-  get(key: string, password: string): string | null {
+  async get(key: string, password: string): Promise<string | null> {
     if (typeof key !== 'string' || key.length === 0) {
       throw new Error('Key must be a non-empty string');
     }
@@ -947,20 +946,19 @@ export class SecureStorage {
       throw new Error('Password must be a non-empty string');
     }
 
-    let encrypted = this.storage.get(key);
+    let encrypted: string | null = this.storage.get(key) ?? null;
 
     // Try to load from storage if not in memory
     if (!encrypted && this.storageBackend) {
-      this.storageBackend.get(key)
-        .then((value) => {
-          if (value) {
-            this.storage.set(key, value);
-            encrypted = value;
-          }
-        })
-        .catch((error) => {
-          this.logger?.error('Failed to load from storage', { error, key });
-        });
+      try {
+        const value = await this.storageBackend.get(key);
+        if (value) {
+          this.storage.set(key, value);
+          encrypted = value;
+        }
+      } catch (error) {
+        this.logger?.error('Failed to load from storage', { error, key });
+      }
     }
 
     if (!encrypted) {
@@ -1160,9 +1158,6 @@ export class GDPRCompliance {
     return deepAnonymize(data) as Record<string, unknown>;
   }
 
-  /**
-   * Check if data contains PII
-   */
   static containsPII(data: Record<string, unknown>): boolean {
     const piiFieldsLower = new Set(
       GDPRCompliance.PII_FIELDS.map((field) => field.toLowerCase())
@@ -1223,7 +1218,6 @@ export class GDPRCompliance {
   }
 }
 
-// Default instances
 export const defaultEncryption = new EncryptionUtil();
 
 export const security = {

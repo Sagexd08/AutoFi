@@ -476,7 +476,7 @@ const token = tokenManager.createToken(
 );
 
 // Validate token
-const payload = tokenManager.validateToken(token);
+const payload = await tokenManager.validateToken(token);
 
 // Revoke token
 tokenManager.revokeToken(token);
@@ -512,7 +512,7 @@ const storage = new SecureStorage();
 storage.set('apiKey', 'secret-key', 'password');
 
 // Retrieve and decrypt
-const apiKey = storage.get('apiKey', 'password');
+const apiKey = await storage.get('apiKey', 'password');
 ```
 
 ## Configuration
