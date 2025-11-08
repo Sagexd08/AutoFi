@@ -64,14 +64,8 @@ function ensureDependencies() {
   if (!riskEngine) {
     riskEngine = new RiskEngine({
       maxRiskScore: process.env.MAX_RISK_SCORE ? Number(process.env.MAX_RISK_SCORE) : 0.95,
-      rules: {
-        spendingLimits: {
-          daily: process.env.DEFAULT_DAILY_LIMIT ? BigInt(process.env.DEFAULT_DAILY_LIMIT) : BigInt(1_000_000_000_000_000_000n),
-          perTransaction: process.env.DEFAULT_PER_TX_LIMIT
-            ? BigInt(process.env.DEFAULT_PER_TX_LIMIT)
-            : BigInt(200_000_000_000_000_000n),
-        },
-      },
+      approvalThreshold: 0.6,
+      blockThreshold: 0.85,
     });
   }
 

@@ -126,6 +126,8 @@ export interface TransactionRiskCandidate {
   data?: string;
   gasLimit?: string;
   gasPrice?: string;
+  maxFeePerGas?: string;
+  maxPriorityFeePerGas?: string;
   chainId?: number;
 }
 
@@ -136,12 +138,15 @@ export interface RiskEvaluationInput {
   agent?: AgentRiskProfile;
   history?: {
     averageValue?: string;
+    standardDeviation?: string;
     last24hCount?: number;
     avgRiskScore?: number;
   };
   context?: {
     knownContracts?: Address[];
-    chainHealth?: Record<string, { healthy: boolean }>;
+    trustedProtocols?: Address[];
+    sanctionedAddresses?: Address[];
+    chainHealth?: Record<string, { healthy: boolean; latencyMs?: number; blockNumber?: bigint | number | string }>;
   };
   overrides?: RiskOverride;
 }

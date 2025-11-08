@@ -14,7 +14,6 @@ import { eventRoutes } from './routes/events.js';
 import { healthRoutes } from './routes/health.js';
 import { logger } from './utils/logger.js';
 import { sanitizeErrorForLogging, generateErrorCode } from './utils/error-sanitizer.js';
-import { setupSwagger } from './utils/swagger.js';
 import { setupMetricsRoute } from './middleware/metrics-route.js';
 import { auditMiddleware } from './middleware/audit.js';
 
@@ -44,7 +43,6 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/health', healthRoutes);
 
-setupSwagger(app);
 setupMetricsRoute(app);
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

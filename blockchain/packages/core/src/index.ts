@@ -5,6 +5,9 @@ export { DecisionEngine } from "./decision-engine";
 export { AgentEngine } from "./agent-engine";
 export { AlchemyClient } from "./alchemy-client";
 export { SecureTransactionManager } from "./secure-transaction-manager";
+export { abiRegistry } from "./abi-registry";
+export { chainHealthMonitor } from "./chain-health";
+export { gasOptimizer } from "./gas-optimizer";
 
 // Functional API exports
 export * from "./functions";
