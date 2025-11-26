@@ -1,0 +1,48 @@
+{
+  "name": "@celo-ai/risk-engine",
+  "version": "1.0.0",
+  "description": "Autofi Risk Engine - PRD-compliant risk scoring (0.0-1.0)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist",
+    "type-check": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "autofi",
+    "risk",
+    "blockchain",
+    "security",
+    "compliance",
+    "defi"
+  ],
+  "author": "Autofi Team",
+  "license": "MIT",
+  "dependencies": {
+    "@celo-automator/types": "workspace:*",
+    "pino": "^9.0.0",
+    "zod": "^3.23.8",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "rimraf": "^6.1.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

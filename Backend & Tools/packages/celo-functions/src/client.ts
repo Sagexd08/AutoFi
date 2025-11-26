@@ -1,0 +1,69 @@
+import {
+  createPublicClient,
+  createWalletClient,
+  http,
+  PublicClient,
+  WalletClient,
+} from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+import { celo, celoAlfajores } from 'viem/chains';
+
+const CELO_CHAINS = {
+  alfajores: celoAlfajores,
+  mainnet: celo,
+} as const;
+
+export interface CeloClientConfig {
+  privateKey?: string;
+  network: 'alfajores' | 'mainnet';
+  rpcUrl?: string;
+}
+
+export class CeloClient {
+  private publicClient: PublicClient;
+  private walletClient?: WalletClient;
+  private chain: typeof celo | typeof celoAlfajores;
+  private networkConfig: CeloClientConfig;
+
+  constructor(config: CeloClientConfig) {
+    this.networkConfig = config;
+    this.chain = CELO_CHAINS[config.network];
+    const rpcUrl = config.rpcUrl || this.getDefaultRpcUrl(config.network);
+
+    this.publicClient = createPublicClient({
+      chain: this.chain,
+      transport: http(rpcUrl),
+    }) as PublicClient;
+
+    if (config.privateKey) {
+      const account = privateKeyToAccount(config.privateKey as `0x${string}`);
+      this.walletClient = createWalletClient({
+        chain: this.chain,
+        transport: http(rpcUrl),
+        account,
+      });
+    }
+  }
+
+  private getDefaultRpcUrl(network: 'alfajores' | 'mainnet'): string {
+    return network === 'alfajores'
+      ? 'https://alfajores-forno.celo-testnet.org'
+      : 'https://forno.celo.org';
+  }
+
+  getPublicClient(): PublicClient {
+    return this.publicClient;
+  }
+
+  getWalletClient(): WalletClient | undefined {
+    return this.walletClient;
+  }
+
+  getChain() {
+    return this.chain;
+  }
+
+  getNetworkConfig(): CeloClientConfig {
+    return this.networkConfig;
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "name": "@autofi/database",
+  "version": "1.0.0",
+  "description": "Database layer with Prisma ORM for Autofi",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./client": {
+      "import": "./dist/client.js",
+      "types": "./dist/client.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "generate": "prisma generate",
+    "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "push": "prisma db push",
+    "studio": "prisma studio",
+    "seed": "tsx src/seed.ts",
+    "lint": "eslint src/",
+    "clean": "rimraf dist .turbo"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.0.0"
+  },
+  "devDependencies": {
+    "prisma": "^6.0.0",
+    "rimraf": "^6.1.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.3.0"
+  },
+  "keywords": [
+    "autofi",
+    "database",
+    "prisma",
+    "orm"
+  ],
+  "license": "MIT"
+}

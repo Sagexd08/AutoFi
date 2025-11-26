@@ -1,0 +1,121 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: Backend/sdk/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: Backend/sdk
+      run: npm ci
+    
+    - name: Run linter
+      working-directory: Backend/sdk
+      run: npm run lint
+    
+    - name: Run security audit
+      working-directory: Backend/sdk
+      run: npm run security:warning
+    
+    - name: Run tests
+      working-directory: Backend/sdk
+      run: npm test
+    
+    - name: Generate coverage
+      working-directory: Backend/sdk
+      run: npm run test:coverage
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./Backend/sdk/coverage/lcov.info
+        flags: unittests
+        name: codecov-umbrella
+
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: Backend/sdk/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: Backend/sdk
+      run: npm ci
+    
+    - name: Build SDK
+      working-directory: Backend/sdk
+      run: npm run build
+    
+    - name: Build with Webpack
+      working-directory: Backend/sdk
+      run: npm run build:webpack || true
+    
+    - name: Check bundle size
+      working-directory: Backend/sdk
+      run: |
+        if [ -f dist/index.bundle.js ]; then
+          ls -lh dist/*.bundle.js
+        fi
+
+  publish:
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        registry-url: 'https://registry.npmjs.org'
+        always-auth: true
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    - name: Install dependencies
+      working-directory: Backend/sdk
+      run: npm ci
+
+    - name: Run tests
+      working-directory: Backend/sdk
+      run: npm test
+
+    - name: Build
+      working-directory: Backend/sdk
+      run: npm run build
+
+    - name: Publish to NPM
+      working-directory: Backend/sdk
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      run: npm publish --access public
+

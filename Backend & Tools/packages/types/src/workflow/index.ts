@@ -1,0 +1,85 @@
+import { z } from 'zod';
+
+export const WorkflowTriggerSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('event'),
+    event: z.object({
+      contractAddress: z.string(),
+      eventName: z.string(),
+      filter: z.record(z.any()).optional(),
+    }),
+  }),
+  z.object({
+    type: z.literal('cron'),
+    cron: z.string(),
+  }),
+  z.object({
+    type: z.literal('manual'),
+  }),
+  z.object({
+    type: z.literal('condition'),
+    condition: z.object({
+      type: z.enum(['balance', 'price', 'custom']),
+      operator: z.enum(['gt', 'gte', 'lt', 'lte', 'eq']),
+      value: z.union([z.string(), z.number()]),
+    }),
+  }),
+]);
+export const WorkflowActionSchema: z.ZodType<any> = z.object({
+  type: z.enum([
+    'transfer',
+    'contract_call',
+    'deploy',
+    'notify',
+    'conditional',
+    'batch',
+  ]),
+  to: z.string().optional(),
+  amount: z.string().optional(),
+  tokenAddress: z.string().optional(),
+  contractAddress: z.string().optional(),
+  functionName: z.string().optional(),
+  parameters: z.array(z.any()).optional(),
+  webhookUrl: z.string().optional(),
+  message: z.string().optional(),
+  condition: z.object({
+    type: z.string(),
+    operator: z.string(),
+    value: z.union([z.string(), z.number()]),
+  }).optional(),
+  actions: z.array(z.lazy(() => WorkflowActionSchema)).optional(),
+});
+
+export const WorkflowSchema = z.object({
+  id: z.string().optional(),
+  name: z.string(),
+  description: z.string().optional(),
+  trigger: WorkflowTriggerSchema,
+  actions: z.array(WorkflowActionSchema),
+  enabled: z.boolean().default(true),
+  metadata: z.record(z.any()).optional(),
+});
+
+export type WorkflowTrigger = z.infer<typeof WorkflowTriggerSchema>;
+export type WorkflowAction = z.infer<typeof WorkflowActionSchema>;
+export type Workflow = z.infer<typeof WorkflowSchema>;
+
+export interface WorkflowExecution {
+  id: string;
+  workflowId: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  startedAt: string;
+  completedAt?: string;
+  error?: string;
+  results?: Record<string, any>;
+  transactionHashes?: string[];
+}
+
+export interface WorkflowTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  workflow: Omit<Workflow, 'id'>;
+  tags: string[];
+}

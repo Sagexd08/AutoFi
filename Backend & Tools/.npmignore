@@ -1,0 +1,17 @@
+.git
+.gitignore
+node_modules/
+test/
+test-data/
+data/
+backups/
+*.log
+.env*
+.eslintrc*
+.prettierrc*
+coverage/
+docs/
+examples/
+.vscode/
+.idea/
+*.tgz

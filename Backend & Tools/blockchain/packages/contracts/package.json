@@ -1,0 +1,36 @@
+{
+  "name": "@celo-ai-agents/contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for Celo AI Agent Library",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:sepolia": "hardhat run scripts/deploy-with-address.ts --network sepolia",
+    "deploy:wallet": "hardhat run scripts/deploy-wallet-direct.ts --network sepolia",
+    "deploy:external": "hardhat run scripts/deploy-external-wallet.ts --network sepolia",
+    "deploy:sender": "hardhat run scripts/deploy-wallet-sender.ts --network sepolia",
+    "deploy:three": "hardhat run scripts/deploy-three-contracts.ts --network sepolia",
+    "deploy:celo-sepolia": "hardhat run scripts/deploy-three-contracts.ts --network celoSepolia",
+    "verify:celo-sepolia": "hardhat run scripts/verify-celo-sepolia.ts --network sepolia",
+    "simulate:sepolia": "hardhat run scripts/deploy-sepolia-simulation.ts --network sepolia",
+    "generate:key": "hardhat run scripts/generate-key.ts",
+    "verify:deployment": "hardhat run scripts/verify-deployment.ts --network sepolia",
+    "deploy:celo": "hardhat run scripts/deploy-all.ts --network celo",
+    "verify:alfajores": "hardhat verify --network alfajores",
+    "verify:celo": "hardhat verify --network celo",
+    "clean": "rm -rf dist artifacts cache"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.9.3",
+    "hardhat": "^2.19.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "ethers": "^6.8.0"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.0",
+    "@types/mocha": "^10.0.0",
+    "chai": "^4.3.0"
+  }
+}

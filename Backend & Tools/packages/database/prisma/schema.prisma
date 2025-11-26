@@ -1,0 +1,772 @@
+// Autofi Database Schema
+// Comprehensive schema for AI-driven blockchain automation platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USER & AUTHENTICATION
+// ============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String?   @unique
+  walletAddress String    @unique
+  name          String?
+  avatar        String?
+  role          UserRole  @default(USER)
+  apiKey        String?   @unique
+  apiKeyHash    String?
+  
+  // Preferences
+  defaultChainId Int       @default(42220) // Celo mainnet
+  notificationsEnabled Boolean @default(true)
+  
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastActiveAt  DateTime?
+  
+  // Relations
+  agents        Agent[]
+  workflows     Workflow[]
+  transactions  Transaction[]
+  approvals     Approval[]
+  sessions      Session[]
+  auditLogs     AuditLog[]
+  plans         Plan[]
+  
+  @@index([walletAddress])
+  @@index([apiKey])
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  OPERATOR
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token        String   @unique
+  expiresAt    DateTime
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+  
+  @@index([userId])
+  @@index([token])
+}
+
+// ============================================================================
+// AGENTS
+// ============================================================================
+
+model Agent {
+  id              String      @id @default(cuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Agent Configuration
+  type            AgentType
+  name            String
+  description     String?
+  objectives      String[]
+  promptPreamble  String?
+  
+  // Execution Settings
+  executionMode   ExecutionMode @default(PROPOSE)
+  isActive        Boolean       @default(true)
+  
+  // Spending Limits (stored as strings for BigInt compatibility)
+  dailyLimit      String?       @default("0")
+  perTxLimit      String?       @default("0")
+  cumulative24h   String?       @default("0")
+  lastResetAt     DateTime      @default(now())
+  
+  // Access Control
+  whitelist       String[]      // Allowed addresses
+  blacklist       String[]      // Blocked addresses
+  permissions     String[]      // Granted permissions
+  
+  // Metadata
+  metadata        Json?
+  tags            String[]
+  
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  workflows       Workflow[]
+  transactions    Transaction[]
+  approvals       Approval[]
+  
+  @@index([userId])
+  @@index([type])
+  @@index([isActive])
+}
+
+enum AgentType {
+  TREASURY
+  DEFI
+  NFT
+  GOVERNANCE
+  DONATION
+  ANALYTICS
+  CUSTOM
+}
+
+enum ExecutionMode {
+  PROPOSE
+  AUTO_EXECUTE
+  APPROVAL_REQUIRED
+}
+
+// ============================================================================
+// WORKFLOWS
+// ============================================================================
+
+model Workflow {
+  id              String          @id @default(cuid())
+  userId          String
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentId         String?
+  agent           Agent?          @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  
+  // Workflow Definition
+  name            String
+  description     String?
+  trigger         Json            // WorkflowTrigger JSON
+  actions         Json            // WorkflowAction[] JSON
+  
+  // Status
+  status          WorkflowStatus  @default(DRAFT)
+  enabled         Boolean         @default(true)
+  
+  // Scheduling
+  cronExpression  String?
+  nextRunAt       DateTime?
+  lastRunAt       DateTime?
+  
+  // Execution Stats
+  runCount        Int             @default(0)
+  successCount    Int             @default(0)
+  failureCount    Int             @default(0)
+  
+  // Metadata
+  metadata        Json?
+  tags            String[]
+  
+  // Timestamps
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  // Relations
+  executions      WorkflowExecution[]
+  
+  @@index([userId])
+  @@index([agentId])
+  @@index([status])
+  @@index([enabled])
+  @@index([nextRunAt])
+}
+
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  FAILED
+  ARCHIVED
+}
+
+model WorkflowExecution {
+  id              String              @id @default(cuid())
+  workflowId      String
+  workflow        Workflow            @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  
+  // Execution Status
+  status          ExecutionStatus     @default(PENDING)
+  
+  // Timing
+  startedAt       DateTime            @default(now())
+  completedAt     DateTime?
+  
+  // Results
+  results         Json?
+  error           String?
+  transactionHashes String[]
+  
+  // Performance Metrics
+  durationMs      Int?
+  gasUsed         String?
+  
+  // Metadata
+  metadata        Json?
+  
+  // Relations
+  steps           WorkflowStep[]
+  transactions    Transaction[]
+  
+  @@index([workflowId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+enum ExecutionStatus {
+  PENDING
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  TIMEOUT
+}
+
+model WorkflowStep {
+  id              String              @id @default(cuid())
+  executionId     String
+  execution       WorkflowExecution   @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  
+  // Step Definition
+  stepIndex       Int
+  actionType      String
+  actionConfig    Json
+  
+  // Execution
+  status          ExecutionStatus     @default(PENDING)
+  startedAt       DateTime?
+  completedAt     DateTime?
+  
+  // Results
+  result          Json?
+  error           String?
+  transactionHash String?
+  
+  // Retry Info
+  retryCount      Int                 @default(0)
+  maxRetries      Int                 @default(3)
+  lastError       String?
+  
+  @@index([executionId])
+  @@index([status])
+}
+
+// ============================================================================
+// TRANSACTIONS
+// ============================================================================
+
+model Transaction {
+  id              String              @id @default(cuid())
+  userId          String
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentId         String?
+  agent           Agent?              @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  executionId     String?
+  execution       WorkflowExecution?  @relation(fields: [executionId], references: [id], onDelete: SetNull)
+  
+  // Transaction Details
+  chainId         Int
+  hash            String?             @unique
+  from            String
+  to              String
+  value           String              @default("0")
+  data            String?
+  
+  // Gas Information
+  gasLimit        String?
+  gasPrice        String?
+  maxFeePerGas    String?
+  maxPriorityFeePerGas String?
+  gasUsed         String?
+  
+  // Status
+  status          TransactionStatus   @default(PENDING)
+  nonce           Int?
+  blockNumber     Int?
+  blockHash       String?
+  
+  // Risk Assessment
+  riskScore       Float?
+  riskLevel       RiskLevel?
+  requiresApproval Boolean            @default(false)
+  
+  // Simulation
+  simulationResult Json?
+  simulatedAt     DateTime?
+  
+  // Token Transfer Details (if applicable)
+  tokenAddress    String?
+  tokenAmount     String?
+  tokenSymbol     String?
+  tokenDecimals   Int?
+  
+  // Metadata
+  memo            String?
+  metadata        Json?
+  
+  // Timestamps
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  confirmedAt     DateTime?
+  
+  // Relations
+  approval        Approval?
+  
+  @@index([userId])
+  @@index([agentId])
+  @@index([executionId])
+  @@index([chainId])
+  @@index([hash])
+  @@index([status])
+  @@index([from])
+  @@index([to])
+  @@index([createdAt])
+}
+
+enum TransactionStatus {
+  PENDING
+  QUEUED
+  SIMULATING
+  AWAITING_APPROVAL
+  APPROVED
+  REJECTED
+  BROADCASTING
+  BROADCASTED
+  CONFIRMED
+  FAILED
+  CANCELLED
+  REPLACED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// ============================================================================
+// APPROVALS
+// ============================================================================
+
+model Approval {
+  id              String              @id @default(cuid())
+  userId          String
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentId         String?
+  agent           Agent?              @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  transactionId   String              @unique
+  transaction     Transaction         @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  
+  // Approval Details
+  status          ApprovalStatus      @default(PENDING)
+  priority        ApprovalPriority    @default(NORMAL)
+  
+  // Risk Information
+  riskScore       Float
+  riskLevel       RiskLevel
+  riskReasons     String[]
+  recommendations String[]
+  
+  // Simulation Summary
+  simulationSummary Json?
+  simulationSuccess Boolean?
+  
+  // Request Details
+  requestedBy     String?             // Agent or system that requested
+  requestReason   String?
+  requestedAt     DateTime            @default(now())
+  
+  // Resolution
+  resolvedBy      String?             // User wallet address who resolved
+  resolvedAt      DateTime?
+  resolution      String?             // Approve/Reject reason
+  
+  // Expiry
+  expiresAt       DateTime?
+  
+  // Metadata
+  metadata        Json?
+  
+  @@index([userId])
+  @@index([agentId])
+  @@index([status])
+  @@index([priority])
+  @@index([requestedAt])
+  @@index([expiresAt])
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum ApprovalPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+// ============================================================================
+// AUDIT LOGS
+// ============================================================================
+
+model AuditLog {
+  id              String              @id @default(cuid())
+  userId          String?
+  user            User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  // Event Details
+  eventType       AuditEventType
+  eventCode       String
+  action          String
+  
+  // Context
+  resourceType    String?
+  resourceId      String?
+  
+  // Request Info
+  ipAddress       String?
+  userAgent       String?
+  requestId       String?
+  
+  // Payload
+  input           Json?               // Request input (sanitized)
+  output          Json?               // Response output (sanitized)
+  changes         Json?               // Before/after changes
+  
+  // Outcome
+  success         Boolean             @default(true)
+  errorMessage    String?
+  errorCode       String?
+  
+  // Performance
+  durationMs      Int?
+  
+  // Metadata
+  metadata        Json?
+  
+  // Timestamp
+  createdAt       DateTime            @default(now())
+  
+  @@index([userId])
+  @@index([eventType])
+  @@index([eventCode])
+  @@index([resourceType, resourceId])
+  @@index([createdAt])
+  @@index([requestId])
+}
+
+enum AuditEventType {
+  AUTH
+  AGENT
+  WORKFLOW
+  TRANSACTION
+  APPROVAL
+  SYSTEM
+  API
+  CHAIN
+}
+
+// ============================================================================
+// CHAIN CONFIGURATION
+// ============================================================================
+
+model Chain {
+  id              Int                 @id
+  name            String
+  shortName       String
+  nativeCurrency  Json                // { name, symbol, decimals }
+  rpcUrls         String[]
+  blockExplorerUrls String[]
+  
+  // Status
+  isEnabled       Boolean             @default(true)
+  isTestnet       Boolean             @default(false)
+  
+  // Health
+  lastHealthCheck DateTime?
+  isHealthy       Boolean             @default(true)
+  latencyMs       Int?
+  
+  // Gas Settings
+  defaultGasLimit String?
+  maxGasPrice     String?
+  
+  // Metadata
+  iconUrl         String?
+  metadata        Json?
+  
+  // Timestamps
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  
+  @@index([isEnabled])
+}
+
+// ============================================================================
+// QUEUE JOBS (for BullMQ persistence/tracking)
+// ============================================================================
+
+model QueueJob {
+  id              String              @id @default(cuid())
+  queueName       String
+  jobId           String
+  jobType         String
+  
+  // Payload
+  data            Json
+  
+  // Status
+  status          JobStatus           @default(PENDING)
+  priority        Int                 @default(0)
+  
+  // Execution
+  attempts        Int                 @default(0)
+  maxAttempts     Int                 @default(3)
+  lastError       String?
+  
+  // Timing
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  
+  // Results
+  result          Json?
+  
+  // Parent/Child relationships
+  parentJobId     String?
+  
+  // Metadata
+  metadata        Json?
+  
+  // Timestamps
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  
+  @@unique([queueName, jobId])
+  @@index([queueName])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([parentJobId])
+}
+
+enum JobStatus {
+  PENDING
+  QUEUED
+  ACTIVE
+  COMPLETED
+  FAILED
+  DELAYED
+  PAUSED
+}
+
+// ============================================================================
+// NOTIFICATIONS
+// ============================================================================
+
+model Notification {
+  id              String              @id @default(cuid())
+  userId          String
+  
+  // Content
+  type            NotificationType
+  title           String
+  message         String
+  
+  // Reference
+  resourceType    String?
+  resourceId      String?
+  
+  // Status
+  isRead          Boolean             @default(false)
+  readAt          DateTime?
+  
+  // Delivery
+  channels        String[]            // ['in_app', 'email', 'webhook']
+  deliveredAt     DateTime?
+  
+  // Metadata
+  metadata        Json?
+  
+  // Timestamp
+  createdAt       DateTime            @default(now())
+  
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  APPROVAL_REQUEST
+  TRANSACTION_UPDATE
+  WORKFLOW_UPDATE
+  SYSTEM
+}
+
+// ============================================================================
+// PLANS (AI-Generated Execution Plans)
+// ============================================================================
+
+model Plan {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Original Input
+  originalPrompt  String        @db.Text
+  parsedIntent    Json          // Full ParsedIntent JSON
+  
+  // Risk Assessment
+  riskScore       Float         @default(0)
+  riskLevel       RiskLevel?
+  riskReasons     String[]
+  
+  // Status
+  status          PlanStatus    @default(DRAFT)
+  
+  // Simulation Results
+  simulation      Json?         // SimulationResult JSON
+  simulatedAt     DateTime?
+  
+  // Execution
+  executedAt      DateTime?
+  completedAt     DateTime?
+  
+  // Scheduling
+  isRecurring     Boolean       @default(false)
+  cronExpression  String?
+  nextRunAt       DateTime?
+  
+  // Metadata
+  metadata        Json?
+  
+  // Timestamps
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Relations
+  steps           PlanStep[]
+  planApproval    PlanApproval?
+  
+  @@index([userId])
+  @@index([status])
+  @@index([riskScore])
+  @@index([createdAt])
+  @@index([nextRunAt])
+}
+
+enum PlanStatus {
+  DRAFT
+  SIMULATING
+  PENDING_APPROVAL
+  APPROVED
+  EXECUTING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model PlanStep {
+  id              String          @id @default(cuid())
+  planId          String
+  plan            Plan            @relation(fields: [planId], references: [id], onDelete: Cascade)
+  
+  // Step Definition
+  stepIndex       Int
+  chainId         Int
+  contract        String?
+  functionName    String
+  params          Json
+  
+  // Simulation
+  simulation      Json?           // Step-level simulation result
+  simulatedAt     DateTime?
+  
+  // Execution
+  txHash          String?
+  status          PlanStepStatus  @default(PENDING)
+  executedAt      DateTime?
+  
+  // Error Handling
+  error           String?
+  retryCount      Int             @default(0)
+  maxRetries      Int             @default(3)
+  
+  // Gas Info
+  gasEstimate     String?
+  gasUsed         String?
+  
+  // Metadata
+  metadata        Json?
+  
+  // Timestamps
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  @@index([planId])
+  @@index([status])
+  @@index([txHash])
+}
+
+enum PlanStepStatus {
+  PENDING
+  SIMULATING
+  SIMULATED
+  EXECUTING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+model PlanApproval {
+  id              String              @id @default(cuid())
+  planId          String              @unique
+  plan            Plan                @relation(fields: [planId], references: [id], onDelete: Cascade)
+  
+  // Approval Request
+  requestedAt     DateTime            @default(now())
+  expiresAt       DateTime?
+  
+  // Resolution
+  status          ApprovalStatus      @default(PENDING)
+  approver        String?             // Wallet address of approver
+  decision        PlanApprovalDecision?
+  comment         String?
+  signedMessage   String?             // EIP-712 signed approval
+  resolvedAt      DateTime?
+  
+  // Risk Info at time of request
+  riskScore       Float
+  riskLevel       RiskLevel
+  riskReasons     String[]
+  
+  // Simulation summary
+  simulationSummary Json?
+  
+  @@index([status])
+  @@index([requestedAt])
+}
+
+enum PlanApprovalDecision {
+  APPROVED
+  REJECTED
+}
