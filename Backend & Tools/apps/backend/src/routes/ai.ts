@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pino } from 'pino';
 import { createAIEngine, type AIEngine, type ParsedIntent } from '@autofi/ai-engine';
-import { createOrchestrator, MultiAgentOrchestrator } from '@celo-ai/agents';
+import { createOrchestrator, MultiAgentOrchestrator } from '@autofi/agents';
 
 const logger = pino({ name: 'ai-routes' });
 const router = Router();
@@ -110,7 +110,7 @@ router.post('/process', async (req: Request, res: Response) => {
 
 /**
  * POST /api/ai/plan
- * Create a complete execution plan from natural language
+ * Generate full execution plan with risk assessment and simulation
  */
 router.post('/plan', async (req: Request, res: Response) => {
   try {
@@ -123,113 +123,37 @@ router.post('/plan', async (req: Request, res: Response) => {
       });
     }
 
-    const { prompt, chainId, balances, autoApprove } = validation.data;
+    const { prompt, chainId, balances } = validation.data;
     const userId = (req as any).user?.id || 'anonymous';
     const walletAddress = (req as any).user?.walletAddress || '0x0';
 
-    logger.info({ userId, promptLength: prompt.length }, 'Creating execution plan');
+    logger.info({ userId, promptLength: prompt.length }, 'Generating execution plan');
 
-    const orch = getOrchestrator();
-    const context = {
+    const orchestrator = getOrchestrator();
+    const result = await orchestrator.runPipeline(prompt, {
       userId,
       walletAddress,
       chainId,
       balances,
-    };
+    });
 
-    // Step 1: Parse intent
-    const intentResult = await orch.processIntent(prompt, context);
-    if (!intentResult.success || !intentResult.data) {
+    if (result.error) {
       return res.status(422).json({
         success: false,
-        error: intentResult.error || 'Failed to parse intent',
-        stage: 'intent',
+        error: result.error,
+        data: result,
       });
     }
-
-    const intent = intentResult.data.intent;
-
-    // Check if clarification needed
-    if (intentResult.data.requiresClarification) {
-      return res.status(200).json({
-        success: true,
-        requiresClarification: true,
-        clarificationQuestions: intentResult.data.clarificationQuestions,
-        partialIntent: intent,
-      });
-    }
-
-    // Step 2: Create plan
-    const planResult = await orch.createPlan(intent, context);
-    if (!planResult.success || !planResult.data) {
-      return res.status(422).json({
-        success: false,
-        error: planResult.error || 'Failed to create plan',
-        stage: 'planning',
-      });
-    }
-
-    const plan = planResult.data;
-
-    // Step 3: Assess risk
-    const riskResult = await orch.assessRisk(plan, context);
-    if (!riskResult.success || !riskResult.data) {
-      return res.status(422).json({
-        success: false,
-        error: riskResult.error || 'Failed to assess risk',
-        stage: 'risk',
-      });
-    }
-
-    const risk = riskResult.data;
-
-    // Step 4: Simulate
-    const simResult = await orch.simulate(plan, context);
-    if (!simResult.success || !simResult.data) {
-      return res.status(422).json({
-        success: false,
-        error: simResult.error || 'Simulation failed',
-        stage: 'simulation',
-      });
-    }
-
-    const simulation = simResult.data;
-
-    // Determine if approval is required
-    const requiresApproval = risk.requiresApproval || risk.blockExecution;
 
     return res.json({
       success: true,
-      plan: {
-        id: plan.id,
-        steps: plan.steps,
-        estimatedGas: plan.estimatedGas,
-        estimatedTime: plan.estimatedTime,
-        crossChainRequired: plan.crossChainRequired,
-      },
-      risk: {
-        score: risk.overallScore,
-        classification: risk.classification,
-        requiresApproval: risk.requiresApproval,
-        blockExecution: risk.blockExecution,
-        factors: risk.factors,
-        recommendations: risk.recommendations,
-      },
-      simulation: {
-        success: simulation.success,
-        totalGasUsed: simulation.totalGasUsed,
-        warnings: simulation.warnings,
-        errors: simulation.errors,
-      },
-      requiresApproval,
-      canAutoExecute: !requiresApproval && risk.overallScore < 0.35,
-      originalIntent: intent,
+      data: result,
     });
   } catch (error) {
-    logger.error({ error }, 'Plan creation failed');
+    logger.error({ error }, 'Plan generation failed');
     return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Internal server error',
+      error: 'Internal server error',
     });
   }
 });
@@ -316,7 +240,7 @@ router.get('/status/:planId', async (req: Request, res: Response) => {
 router.get('/functions', async (_req: Request, res: Response) => {
   try {
     const { FUNCTION_REGISTRY } = await import('@autofi/ai-engine');
-    
+
     return res.json({
       success: true,
       functions: Object.entries(FUNCTION_REGISTRY).map(([name, def]) => ({
@@ -344,7 +268,7 @@ router.get('/functions', async (_req: Request, res: Response) => {
 router.get('/chains', async (_req: Request, res: Response) => {
   try {
     const { ChainIdMap } = await import('@autofi/ai-engine');
-    
+
     return res.json({
       success: true,
       chains: Object.entries(ChainIdMap).map(([name, chainId]) => ({

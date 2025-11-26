@@ -8,8 +8,8 @@ import {
 } from '@autofi/database';
 import { LangChainAgent } from '@celo-automator/langchain-agent';
 import { CeloClient } from '@celo-automator/celo-functions';
-import { RiskEngine } from '@celo-ai/risk-engine';
-import type { TransactionContext } from '@celo-ai/risk-engine';
+import { RiskEngine } from '@autofi/risk-engine';
+import type { TransactionContext } from '@autofi/risk-engine';
 import type { Address } from 'viem';
 import { logger } from '../utils/logger.js';
 

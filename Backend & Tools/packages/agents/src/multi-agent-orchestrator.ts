@@ -1,5 +1,7 @@
 import { pino } from 'pino';
 import { createAIEngine, type AIEngine, type ParsedIntent } from '@autofi/ai-engine';
+import { createAutofiRiskEngine, type AutofiRiskEngine, type AutofiRiskContext, type TriggeredFactor } from '@autofi/risk-engine';
+import { createSimulationEngineFromEnv, type SimulationEngine, type TransactionToSimulate, type SimulationStepResult } from '@autofi/simulation';
 import {
   AgentContext,
   AgentResult,
@@ -28,6 +30,8 @@ const logger = pino({ name: 'agent-orchestrator' });
  */
 export class MultiAgentOrchestrator implements AgentOrchestrator {
   private aiEngine: AIEngine;
+  private riskEngine: AutofiRiskEngine;
+  private simulationEngine: SimulationEngine;
   private config: OrchestratorConfig;
 
   constructor(config: OrchestratorConfig) {
@@ -35,6 +39,50 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
     this.aiEngine = createAIEngine({
       anthropicApiKey: config.aiEngineApiKey,
     });
+    this.riskEngine = createAutofiRiskEngine();
+    this.simulationEngine = createSimulationEngineFromEnv();
+  }
+
+  /**
+   * Run the full agent pipeline: Intent -> Plan -> Risk -> Simulation
+   */
+  async runPipeline(
+    prompt: string,
+    context: AgentContext
+  ): Promise<{
+    intent: AgentResult<IntentAgentOutput>;
+    plan?: AgentResult<ExecutionPlan>;
+    risk?: AgentResult<RiskAgentOutput>;
+    simulation?: AgentResult<SimulationAgentOutput>;
+    error?: string;
+  }> {
+    // 1. Intent
+    const intentResult = await this.processIntent(prompt, context);
+    if (!intentResult.success || !intentResult.data) {
+      return { intent: intentResult, error: intentResult.error };
+    }
+
+    // 2. Plan
+    const planResult = await this.createPlan(intentResult.data.intent, context);
+    if (!planResult.success || !planResult.data) {
+      return { intent: intentResult, plan: planResult, error: planResult.error };
+    }
+
+    // 3. Risk
+    const riskResult = await this.assessRisk(planResult.data, context);
+    if (!riskResult.success || !riskResult.data) {
+      return { intent: intentResult, plan: planResult, risk: riskResult, error: riskResult.error };
+    }
+
+    // 4. Simulation
+    const simulationResult = await this.simulate(planResult.data, context);
+    
+    return {
+      intent: intentResult,
+      plan: planResult,
+      risk: riskResult,
+      simulation: simulationResult
+    };
   }
 
   /**
@@ -177,128 +225,64 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
         stepsCount: plan.steps.length,
       }, 'Assessing risk');
 
-      const factors: RiskFactor[] = [];
-      let totalScore = 0;
-      let totalWeight = 0;
+      const allFactors: RiskFactor[] = [];
+      let maxScore = 0;
+      const allRecommendations: string[] = [];
 
-      // Risk Factor: Large Transfer (> $50k)
-      const hasLargeTransfer = plan.steps.some(step => {
-        const amount = parseFloat(step.params.amount as string || '0');
-        return amount > 50000;
-      });
-      if (hasLargeTransfer) {
-        factors.push({
-          id: 'large_transfer',
-          name: 'Large Transfer',
-          score: 0.25,
-          weight: 1,
-          description: 'Transfer exceeds $50,000',
-          triggered: true,
-        });
-        totalScore += 0.25;
-        totalWeight += 1;
+      for (const step of plan.steps) {
+        // Map step to risk context
+        // In a real implementation, we would fetch token age, user history, etc.
+        const riskContext: AutofiRiskContext = {
+          transactionValue: BigInt(Math.floor(parseFloat(String(step.params.amount || '0')) * 1e18)), // Simplified conversion
+          toAddress: (step.params.to as string) || (step.params.router as string) || '0x0000000000000000000000000000000000000000',
+          fromAddress: context.walletAddress,
+          chainId: step.chainId,
+          isNewToken: false, // Placeholder - would check token registry
+          isFirstInteraction: false, // Placeholder - would check history
+          isCrossChain: plan.crossChainRequired,
+          userTotalTransactions: 10, // Placeholder
+          userAccountAge: 30, // Placeholder
+          simulationSuccess: true, // Assumed for pre-sim risk check
+          dustAttackPattern: false,
+          approvalRemovalMissing: false
+        };
+
+        const assessment = await this.riskEngine.evaluate(riskContext);
+        
+        // Aggregate results
+        maxScore = Math.max(maxScore, assessment.overallScore);
+        
+        const mappedFactors: RiskFactor[] = assessment.factors.map((f: TriggeredFactor) => ({
+            id: f.id,
+            name: f.name,
+            score: f.score,
+            weight: 1,
+            description: f.reason,
+            triggered: true
+        }));
+        
+        allFactors.push(...mappedFactors);
+        allRecommendations.push(...assessment.recommendations);
       }
 
-      // Risk Factor: Very Large Transfer (> $500k)
-      const hasVeryLargeTransfer = plan.steps.some(step => {
-        const amount = parseFloat(step.params.amount as string || '0');
-        return amount > 500000;
-      });
-      if (hasVeryLargeTransfer) {
-        factors.push({
-          id: 'very_large_transfer',
-          name: 'Very Large Transfer',
-          score: 0.45,
-          weight: 1.5,
-          description: 'Transfer exceeds $500,000',
-          triggered: true,
-        });
-        totalScore += 0.45 * 1.5;
-        totalWeight += 1.5;
-      }
+      // Deduplicate factors and recommendations
+      const uniqueFactors = Array.from(new Map(allFactors.map(f => [f.id, f])).values());
+      const uniqueRecommendations = [...new Set(allRecommendations)];
 
-      // Risk Factor: Cross-chain Bridge
-      if (plan.crossChainRequired) {
-        factors.push({
-          id: 'cross_chain_bridge',
-          name: 'Cross-chain Bridge',
-          score: 0.15,
-          weight: 1,
-          description: 'Operation requires cross-chain bridging',
-          triggered: true,
-        });
-        totalScore += 0.15;
-        totalWeight += 1;
-      }
-
-      // Risk Factor: High Slippage
-      const hasHighSlippage = plan.steps.some(step => {
-        const slippage = parseFloat(step.params.slippage as string || '0');
-        return slippage > 3;
-      });
-      if (hasHighSlippage) {
-        factors.push({
-          id: 'high_slippage',
-          name: 'High Slippage',
-          score: 0.18,
-          weight: 1,
-          description: 'Slippage tolerance exceeds 3%',
-          triggered: true,
-        });
-        totalScore += 0.18;
-        totalWeight += 1;
-      }
-
-      // Risk Factor: Multiple Steps
-      if (plan.steps.length > 5) {
-        factors.push({
-          id: 'complex_plan',
-          name: 'Complex Multi-step Plan',
-          score: 0.12,
-          weight: 0.8,
-          description: 'Plan contains more than 5 steps',
-          triggered: true,
-        });
-        totalScore += 0.12 * 0.8;
-        totalWeight += 0.8;
-      }
-
-      // Calculate overall score
-      const overallScore = totalWeight > 0 ? Math.min(totalScore / totalWeight, 1) : 0;
-
-      // Determine classification
+      // Determine classification based on maxScore
       let classification: 'low' | 'medium' | 'high' | 'critical';
-      if (overallScore >= 0.85) classification = 'critical';
-      else if (overallScore >= 0.65) classification = 'high';
-      else if (overallScore >= 0.35) classification = 'medium';
+      if (maxScore >= 0.85) classification = 'critical';
+      else if (maxScore >= 0.65) classification = 'high';
+      else if (maxScore >= 0.35) classification = 'medium';
       else classification = 'low';
 
-      // Determine approval requirements
-      const requiresApproval = overallScore >= 0.35 || factors.some(f => f.triggered && f.score >= 0.25);
-      const blockExecution = overallScore >= 0.65;
-
-      // Generate recommendations
-      const recommendations: string[] = [];
-      if (hasVeryLargeTransfer) {
-        recommendations.push('Consider splitting large transfers into smaller batches');
-      }
-      if (hasHighSlippage) {
-        recommendations.push('Review slippage settings - current tolerance is high');
-      }
-      if (plan.crossChainRequired) {
-        recommendations.push('Cross-chain operations may take additional time');
-      }
-      if (blockExecution) {
-        recommendations.push('Manual review required before execution');
-      }
-
       const output: RiskAgentOutput = {
-        overallScore,
+        overallScore: maxScore,
         classification,
-        requiresApproval,
-        blockExecution,
-        factors,
-        recommendations,
+        requiresApproval: maxScore >= 0.35,
+        blockExecution: maxScore >= 0.85,
+        factors: uniqueFactors,
+        recommendations: uniqueRecommendations,
       };
 
       return {
@@ -330,39 +314,41 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
     try {
       logger.info({ planId: plan.id }, 'Simulating plan');
 
-      // Simulate each step
-      const simulatedSteps: SimulatedStep[] = [];
-      const balanceChanges: BalanceChange[] = [];
-      const warnings: string[] = [];
-      const errors: string[] = [];
-      let totalGas = BigInt(0);
+      // Convert plan steps to transactions
+      // Note: In a full implementation, we would use the ChainAdapter to build actual calldata
+      const transactions: TransactionToSimulate[] = plan.steps.map(step => ({
+        from: context.walletAddress,
+        to: (step.params.to as string) || '0x0000000000000000000000000000000000000000',
+        value: step.functionName === 'transfer' && !step.params.token ? (step.params.amount as string) : '0', // Native transfer
+        data: '0x', // Placeholder - would need ABI encoding
+        chainId: step.chainId,
+        gas: step.estimatedGas
+      }));
 
-      for (const step of plan.steps) {
-        // For now, simulate success (real implementation would use Tenderly/Anvil)
-        const gasUsed = BigInt(step.estimatedGas);
-        totalGas += gasUsed;
-
-        simulatedSteps.push({
-          stepId: step.id,
-          success: true,
-          gasUsed: gasUsed.toString(),
-          logs: [],
-        });
-      }
-
-      // Add placeholder balance changes
-      if (plan.steps.length > 0) {
-        warnings.push('Simulation completed with estimated values. Live simulation pending.');
-      }
+      // Handle multi-chain simulation
+      // For now, we simulate the primary chain of the plan
+      const chainId = plan.steps[0]?.chainId || 1;
+      
+      const result = await this.simulationEngine.simulateBundle(
+        transactions,
+        context.walletAddress,
+        chainId
+      );
 
       const output: SimulationAgentOutput = {
-        success: errors.length === 0,
-        steps: simulatedSteps,
-        totalGasUsed: totalGas.toString(),
-        balanceChanges,
+        success: result.success,
+        steps: result.steps.map((s: SimulationStepResult) => ({
+            stepId: plan.steps[s.index]?.id || `step-${s.index}`,
+            success: s.success,
+            gasUsed: s.gasUsed,
+            logs: s.logs,
+            error: s.error
+        })),
+        totalGasUsed: result.totalGasUsed,
+        balanceChanges: [], // Would map from simulation result
         events: [],
-        warnings,
-        errors,
+        warnings: result.warnings || [],
+        errors: result.error ? [result.error] : []
       };
 
       return {

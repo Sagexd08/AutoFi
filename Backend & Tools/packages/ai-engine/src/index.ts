@@ -14,3 +14,4 @@ export {
   type FunctionDefinition,
 } from './function-registry.js';
 export * from './types.js';
+export { PredictiveIntentAgent, type PredictiveIntentConfig, type PredictionContext, type PredictedIntent } from './predictive-intent.js';

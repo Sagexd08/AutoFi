@@ -18,7 +18,7 @@
     "@celo-automator/core": "workspace:*",
     "@celo-automator/langchain-agent": "workspace:*",
     "@celo-automator/celo-functions": "workspace:*",
-    "@celo-ai/agents": "workspace:*",
+    "@autofi/agents": "workspace:*",
     "@celo-ai/risk-engine": "workspace:*",
     "@autofi/database": "workspace:*",
     "@autofi/chain-adapter": "workspace:*",

@@ -1,5 +1,5 @@
 {
-  "name": "@celo-ai/agents",
+  "name": "@autofi/agents",
   "version": "1.0.0",
   "description": "Autofi Multi-Agent System - Specialized agents for DeFi automation",
   "type": "module",
@@ -29,7 +29,8 @@
   "author": "Autofi Team",
   "license": "MIT",
   "dependencies": {
-    "@celo-ai/risk-engine": "workspace:*",
+    "@autofi/risk-engine": "workspace:*",
+    "@autofi/simulation": "workspace:*",
     "@celo-automator/langchain-agent": "workspace:*",
     "@celo-automator/types": "workspace:*",
     "@autofi/ai-engine": "workspace:*",

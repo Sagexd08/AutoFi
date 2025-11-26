@@ -1,5 +1,5 @@
 {
-  "name": "@celo-ai/risk-engine",
+  "name": "@autofi/risk-engine",
   "version": "1.0.0",
   "description": "Autofi Risk Engine - PRD-compliant risk scoring (0.0-1.0)",
   "type": "module",
