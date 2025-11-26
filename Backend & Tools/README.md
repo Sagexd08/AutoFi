@@ -1,4 +1,4 @@
-# Celo AI Automator
+# Autofi - The AI Operating System for Web3
 
 <div align="center">
 
@@ -7,7 +7,7 @@
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)
 
-**Advanced AI-powered Celo blockchain automation monorepo with LangChain orchestration**
+**Convert natural language into secure, multi-chain blockchain operations**
 
 [Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Contributing](#-contributing)
 
@@ -17,27 +17,45 @@
 
 ## 🌟 Overview
 
-Celo AI Automator is a comprehensive, production-ready platform for building AI-powered autonomous agents on the Celo blockchain. It provides a complete toolkit for blockchain automation, including multi-chain support, intelligent AI agents, dynamic smart contract deployment, and advanced testing capabilities.
+Autofi is the **AI Operating System for Web3**. It allows any human — from retail user to DAO treasury manager to institution — to fully automate any on-chain financial workflow using only natural language.
+
+**One single interface → infinite multi-chain, risk-aware, self-optimizing automation.**
 
 ## ✨ Features
 
 ### 🤖 AI-Powered Automation
-- **LangChain Integration**: Advanced AI orchestration with LangChain
-- **Multi-Agent System**: Treasury Manager, Donation Splitter, Yield Optimizer, NFT Minter, Governance Participant
-- **Natural Language Processing**: Convert natural language instructions into blockchain transactions
+- **Claude 3.5 Sonnet Integration**: State-of-the-art natural language understanding
+- **Multi-Agent System**: Intent, Planner, DeFi, Treasury, Risk, Simulation, Execution, Monitoring agents
+- **Natural Language Interface**: Just type what you want - no code required
 - **Intelligent Decision Making**: AI-powered risk assessment and transaction validation
 
-### 🌐 Multi-Chain Support
-- **Supported Chains**: Ethereum, Polygon, BSC, Arbitrum, Optimism, Celo, Base, Avalanche, and more
-- **Intelligent Routing**: Automatic failover and load balancing
-- **Chain Health Monitoring**: Real-time chain status and performance tracking
-- **Cross-Chain Operations**: Seamless multi-chain transaction management
+### 🌐 Multi-Chain Support (Phase 1 - 12 EVM Chains)
+- **Ethereum, Polygon, Arbitrum, Optimism, Base** - Major L1/L2s
+- **Avalanche, BSC, Celo** - Alternative L1s  
+- **Scroll, zkSync Era, Linea, Mantle** - ZK/Optimistic rollups
+- **Intelligent Routing**: Automatic cross-chain path finding
+- **Chain Health Monitoring**: Real-time status and performance tracking
 
-### 📝 Smart Contract Management
-- **Dynamic Deployment**: Deploy and manage smart contracts on-the-fly
-- **Contract Factory**: Automated contract compilation and deployment
-- **ABI Management**: Automatic ABI generation and management
-- **Gas Optimization**: Built-in gas estimation and optimization
+### 🔧 DeFi Operations
+- **Token Transfers**: Send, pay, distribute tokens with scheduling
+- **DEX Operations**: Swap, add/remove liquidity with optimal routing
+- **Yield Farming**: Stake, unstake, deposit, withdraw, claim rewards
+- **Treasury Management**: Recurring payments, token streaming
+- **Governance**: Vote on proposals, delegate voting power
+- **Advanced**: Portfolio rebalancing, hedging, multicall batching
+
+### 🛡️ Risk Engine (PRD Specification)
+- **Risk Scoring**: 0.0 - 1.0 normalized score
+- **Auto-execute**: Score < 0.35
+- **Notify + Approval**: Score 0.35 - 0.65
+- **Mandatory 2FA**: Score > 0.65
+- **Simulation Required**: All transactions simulated before execution
+
+### 🧪 Simulation Engine
+- **Tenderly Integration**: Cloud-based fork simulation
+- **Anvil/Hardhat Support**: Local fork simulation
+- **Bundle Simulation**: Multi-step transaction preview
+- **Balance Tracking**: See all token changes before execution
 
 ### 🔒 Security & Compliance
 - **Data Masking**: Automatic sanitization of sensitive data in logs and errors
