@@ -28,7 +28,7 @@
   "author": "Autofi Team",
   "license": "MIT",
   "dependencies": {
-    "@celo-automator/types": "workspace:*",
+    "@autofi/types": "workspace:*",
     "pino": "^9.0.0",
     "zod": "^3.23.8",
     "viem": "^2.21.0"

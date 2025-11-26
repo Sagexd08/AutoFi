@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { z } from 'zod';
-import { LangChainAgent } from '@celo-automator/langchain-agent';
-import { CeloClient } from '@celo-automator/celo-functions';
+import { LangChainAgent } from '@autofi/langchain-agent';
+import { CeloClient } from '@autofi/celo-functions';
 import { AgentFactory, type SpecializedAgent, type SpecializedAgentType } from '@autofi/agents';
 import { RiskEngine } from '@autofi/risk-engine';
 import type { TransactionContext } from '@autofi/risk-engine';

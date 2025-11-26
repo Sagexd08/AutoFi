@@ -4,7 +4,7 @@ import type {
   TransactionResult,
   TokenBalance,
   ContractCall,
-} from '@celo-automator/types';
+} from '@autofi/types';
 
 const ERC20_ABI = [
   {

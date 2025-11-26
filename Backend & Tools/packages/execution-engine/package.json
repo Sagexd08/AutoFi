@@ -1,0 +1,35 @@
+{
+  "name": "@autofi/execution-engine",
+  "version": "1.0.0",
+  "description": "Autofi Execution Engine - Transaction Signing, Broadcasting, and Monitoring",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@autofi/wallet-manager": "workspace:*",
+    "@autofi/chain-adapter": "workspace:*",
+    "@autofi/types": "workspace:*",
+    "@autofi/database": "workspace:*",
+    "@autofi/queue": "workspace:*",
+    "viem": "^2.7.1",
+    "pino": "^9.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "rimraf": "^6.1.0",
+    "typescript": "^5.3.0"
+  }
+}

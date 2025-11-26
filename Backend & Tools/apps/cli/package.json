@@ -1,5 +1,5 @@
 {
-  "name": "@celo-automator/cli",
+  "name": "@autofi/cli",
   "version": "2.0.0",
   "description": "Celo Automator CLI - Interactive command-line interface",
   "main": "./dist/index.js",
@@ -17,10 +17,10 @@
     "test": "node -e \"console.log('No tests for @celo-automator/cli yet');\""
   },
   "dependencies": {
-    "@celo-automator/types": "workspace:*",
-    "@celo-automator/core": "workspace:*",
-    "@celo-automator/langchain-agent": "workspace:*",
-    "@celo-automator/celo-functions": "workspace:*",
+    "@autofi/types": "workspace:*",
+    "@autofi/core": "workspace:*",
+    "@autofi/langchain-agent": "workspace:*",
+    "@autofi/celo-functions": "workspace:*",
     "commander": "^11.1.0",
     "inquirer": "^9.2.12",
     "chalk": "^5.3.0",

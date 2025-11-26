@@ -31,9 +31,11 @@
   "dependencies": {
     "@autofi/risk-engine": "workspace:*",
     "@autofi/simulation": "workspace:*",
-    "@celo-automator/langchain-agent": "workspace:*",
-    "@celo-automator/types": "workspace:*",
+    "@autofi/langchain-agent": "workspace:*",
+    "@autofi/types": "workspace:*",
     "@autofi/ai-engine": "workspace:*",
+    "@autofi/execution-engine": "workspace:*",
+    "@autofi/wallet-manager": "workspace:*",
     "@langchain/core": "^0.3.0",
     "pino": "^9.0.0",
     "zod": "^3.23.8"

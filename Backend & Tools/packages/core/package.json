@@ -1,5 +1,5 @@
 {
-  "name": "@celo-automator/core",
+  "name": "@autofi/core",
   "version": "2.0.0",
   "description": "Core shared utilities and business logic for Celo Automator",
   "main": "./dist/index.js",
@@ -22,7 +22,7 @@
     "test": "node -e \"console.log('No tests for @celo-automator/core yet');\""
   },
   "dependencies": {
-    "@celo-automator/types": "workspace:*",
+    "@autofi/types": "workspace:*",
     "zod": "^3.22.4",
     "viem": "^2.21.0"
   },

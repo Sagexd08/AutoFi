@@ -1,6 +1,6 @@
-import type { RiskEngine } from '@celo-ai/risk-engine';
-import type { LangChainAgent } from '@celo-automator/langchain-agent';
-import type { TransactionContext, ValidationResult } from '@celo-ai/risk-engine';
+import type { RiskEngine } from '@autofi/risk-engine';
+import type { LangChainAgent } from '@autofi/langchain-agent';
+import type { TransactionContext, ValidationResult } from '@autofi/risk-engine';
 
 export type SpecializedAgentType = 'treasury' | 'defi' | 'nft' | 'governance' | 'donation';
 

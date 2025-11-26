@@ -1,5 +1,5 @@
 
-import type { Workflow } from '@celo-automator/types';
+import type { Workflow } from '@autofi/types';
 import type {
   RetryConfig,
   CacheConfig,

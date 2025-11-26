@@ -3,7 +3,9 @@ import { getRedisConnection } from '../redis.js';
 import { QUEUE_NAMES, type BaseJobData, type BaseJobResult } from '../types.js';
 
 export interface WorkflowJobData extends BaseJobData {
-  workflowId: string;
+  workflowId?: string;
+  planId?: string;
+  plan?: any;
   executionId?: string;
   trigger?: {
     type: 'manual' | 'scheduled' | 'event' | 'condition';

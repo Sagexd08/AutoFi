@@ -184,7 +184,7 @@ export class AIEngine {
     content: string;
     intent?: ParsedIntent;
   }> {
-    const startTime = Date.now();
+    // const startTime = Date.now();
 
     try {
       yield { type: 'thinking', content: 'Analyzing your request...' };

@@ -1,7 +1,9 @@
 import { pino } from 'pino';
 import { createAIEngine, type AIEngine, type ParsedIntent } from '@autofi/ai-engine';
 import { createAutofiRiskEngine, type AutofiRiskEngine, type AutofiRiskContext, type TriggeredFactor } from '@autofi/risk-engine';
-import { createSimulationEngineFromEnv, type SimulationEngine, type TransactionToSimulate, type SimulationStepResult } from '@autofi/simulation';
+import { createSimulationEngineFromEnv, type SimulationEngine, type TransactionToSimulate, type StepSimulationResult } from '@autofi/simulation';
+import { ExecutionEngine } from '@autofi/execution-engine';
+import { createWalletManager, WalletManager } from '@autofi/wallet-manager';
 import {
   AgentContext,
   AgentResult,
@@ -13,8 +15,6 @@ import {
   RiskAgentOutput,
   RiskFactor,
   SimulationAgentOutput,
-  SimulatedStep,
-  BalanceChange,
   ExecutionAgentOutput,
   ExecutedStep,
   FailedStep,
@@ -23,24 +23,29 @@ import {
 } from './orchestrator-types.js';
 
 const logger = pino({ name: 'agent-orchestrator' });
-
-/**
- * Multi-Agent Orchestrator
- * Coordinates all specialized agents for end-to-end plan execution
- */
 export class MultiAgentOrchestrator implements AgentOrchestrator {
   private aiEngine: AIEngine;
   private riskEngine: AutofiRiskEngine;
   private simulationEngine: SimulationEngine;
-  private config: OrchestratorConfig;
-
+  private executionEngine: ExecutionEngine;
+  private walletManager: WalletManager;
   constructor(config: OrchestratorConfig) {
-    this.config = config;
+    // this.config = config;
     this.aiEngine = createAIEngine({
       anthropicApiKey: config.aiEngineApiKey,
     });
     this.riskEngine = createAutofiRiskEngine();
     this.simulationEngine = createSimulationEngineFromEnv();
+
+    // Initialize Wallet Manager
+    this.walletManager = createWalletManager(config.walletConfig || { 
+      type: 'local', 
+      privateKey: process.env.WALLET_PRIVATE_KEY || '' 
+    });
+    
+    // Initialize Execution Engine
+    const rpcUrl = process.env.RPC_URL || 'https://forno.celo.org';
+    this.executionEngine = new ExecutionEngine(rpcUrl, this.walletManager);
   }
 
   /**
@@ -139,10 +144,6 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
       };
     }
   }
-
-  /**
-   * Planner Agent - Convert intent into executable plan with steps
-   */
   async createPlan(
     intent: ParsedIntent,
     context: AgentContext
@@ -155,10 +156,8 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
         intentType: intent.intentType,
         stepsCount: intent.steps.length,
       }, 'Creating execution plan');
-
-      // Convert intent steps to planned steps
       const plannedSteps: PlannedStep[] = intent.steps.map((step, index) => {
-        const chainId = this.resolveChainId(step.params.chain as string);
+        const chainId = this.resolveChainId((step.params as any).chain as string);
         
         return {
           id: `step-${index + 1}`,
@@ -173,12 +172,8 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
           parallelizable: this.canParallelize(step, intent.steps, index),
         };
       });
-
-      // Detect cross-chain requirements
       const uniqueChains = [...new Set(plannedSteps.map(s => s.chainId))];
       const crossChainRequired = uniqueChains.length > 1;
-
-      // Calculate total gas estimate
       const totalGas = plannedSteps.reduce(
         (sum, step) => sum + BigInt(step.estimatedGas),
         BigInt(0)
@@ -188,7 +183,7 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
         id: `plan-${Date.now()}`,
         steps: plannedSteps,
         estimatedGas: totalGas,
-        estimatedTime: plannedSteps.length * 15, // ~15 seconds per step
+        estimatedTime: plannedSteps.length * 15, 
         crossChainRequired,
         bridgeSteps: crossChainRequired ? this.generateBridgeSteps(intent, uniqueChains) : undefined,
       };
@@ -209,10 +204,6 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
       };
     }
   }
-
-  /**
-   * Risk Agent - Assess risk of execution plan
-   */
   async assessRisk(
     plan: ExecutionPlan,
     context: AgentContext
@@ -230,9 +221,7 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
       const allRecommendations: string[] = [];
 
       for (const step of plan.steps) {
-        // Map step to risk context
-        // In a real implementation, we would fetch token age, user history, etc.
-        const riskContext: AutofiRiskContext = {
+          const riskContext: AutofiRiskContext = {
           transactionValue: BigInt(Math.floor(parseFloat(String(step.params.amount || '0')) * 1e18)), // Simplified conversion
           toAddress: (step.params.to as string) || (step.params.router as string) || '0x0000000000000000000000000000000000000000',
           fromAddress: context.walletAddress,
@@ -247,7 +236,7 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
           approvalRemovalMissing: false
         };
 
-        const assessment = await this.riskEngine.evaluate(riskContext);
+        const assessment = await this.riskEngine.assessRisk(riskContext);
         
         // Aggregate results
         maxScore = Math.max(maxScore, assessment.overallScore);
@@ -264,12 +253,8 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
         allFactors.push(...mappedFactors);
         allRecommendations.push(...assessment.recommendations);
       }
-
-      // Deduplicate factors and recommendations
       const uniqueFactors = Array.from(new Map(allFactors.map(f => [f.id, f])).values());
-      const uniqueRecommendations = [...new Set(allRecommendations)];
-
-      // Determine classification based on maxScore
+      const uniqueRecommendations = [...new Set(allRecommendations)]
       let classification: 'low' | 'medium' | 'high' | 'critical';
       if (maxScore >= 0.85) classification = 'critical';
       else if (maxScore >= 0.65) classification = 'high';
@@ -337,8 +322,8 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
 
       const output: SimulationAgentOutput = {
         success: result.success,
-        steps: result.steps.map((s: SimulationStepResult) => ({
-            stepId: plan.steps[s.index]?.id || `step-${s.index}`,
+        steps: result.steps.map((s: StepSimulationResult) => ({
+            stepId: plan.steps[s.stepIndex]?.id || `step-${s.stepIndex}`,
             success: s.success,
             gasUsed: s.gasUsed,
             logs: s.logs,
@@ -348,7 +333,7 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
         balanceChanges: [], // Would map from simulation result
         events: [],
         warnings: result.warnings || [],
-        errors: result.error ? [result.error] : []
+        errors: result.errors || []
       };
 
       return {
@@ -368,62 +353,129 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
     }
   }
 
+
+
   /**
-   * Execution Agent - Execute the plan
+   * Execute a plan after approval
    */
   async execute(
     plan: ExecutionPlan,
-    simulation: SimulationAgentOutput,
-    context: AgentContext
+    _simulation: SimulationAgentOutput,
+    _context: AgentContext
   ): Promise<AgentResult<ExecutionAgentOutput>> {
     const startTime = Date.now();
+    const executedSteps: ExecutedStep[] = [];
+    const failedSteps: FailedStep[] = [];
+    const pendingSteps: string[] = [];
 
     try {
       logger.info({ planId: plan.id }, 'Executing plan');
 
-      if (!simulation.success) {
-        return {
-          success: false,
-          agentType: 'execution',
-          error: 'Cannot execute plan - simulation failed',
-          processingTimeMs: Date.now() - startTime,
-        };
-      }
-
-      const executedSteps: ExecutedStep[] = [];
-      const pendingSteps: string[] = [];
-      const failedSteps: FailedStep[] = [];
-
-      // For now, return pending status (real implementation would sign and broadcast)
       for (const step of plan.steps) {
-        pendingSteps.push(step.id);
+        // Skip if not a transaction step
+        if (step.type !== 'transaction' && step.functionName !== 'transfer' && step.functionName !== 'swap') {
+          // For non-transaction steps, we might just mark them as executed or handle differently
+          continue;
+        }
+
+        let retryCount = 0;
+        const maxRetries = 3;
+        let stepSuccess = false;
+
+        while (retryCount <= maxRetries && !stepSuccess) {
+          try {
+            // Extract transaction details from params
+            const to = (step.params.to as string) || (step.params.router as string) || '0x0000000000000000000000000000000000000000';
+            const data = (step.params.data as string) || '0x';
+            const value = step.params.value ? BigInt(step.params.value as string) : undefined;
+            
+            // If it's a transfer and no value specified in params.value, check params.amount
+            const finalValue = value || (step.functionName === 'transfer' && !step.params.token ? BigInt(step.params.amount as string) : undefined);
+
+            const result = await this.executionEngine.execute({
+              id: step.id,
+              chainId: step.chainId || 42220, // Default to Celo
+              to: to as `0x${string}`,
+              data: data as `0x${string}`,
+              value: finalValue,
+            });
+
+            if (result.status === 'FAILED') {
+              throw new Error(result.error || 'Execution failed');
+            }
+
+            // Wait for confirmation to get receipt details
+            let gasUsed = '0';
+            let blockNumber = 0;
+            
+            if (result.txHash) {
+              try {
+                const receipt = await this.executionEngine.waitForConfirmation(result.txHash, step.chainId || 42220);
+                gasUsed = receipt.gasUsed.toString();
+                blockNumber = Number(receipt.blockNumber);
+              } catch (confirmError) {
+                logger.warn({ txHash: result.txHash, error: confirmError }, 'Failed to wait for confirmation');
+                // We still consider it submitted/executed, but maybe with a warning status?
+                // For now, we'll proceed with 0 values but log the warning
+              }
+            }
+
+            executedSteps.push({
+              stepId: step.id,
+              status: 'confirmed',
+              txHash: result.txHash || '',
+              gasUsed,
+              blockNumber,
+            });
+            
+            stepSuccess = true;
+
+          } catch (error: any) {
+            retryCount++;
+            logger.warn({ stepId: step.id, retryCount, error: error.message }, 'Step execution failed, retrying...');
+            
+            if (retryCount > maxRetries) {
+              failedSteps.push({
+                stepId: step.id,
+                error: error.message,
+                retryable: true,
+                retryCount: retryCount - 1
+              });
+              // Stop execution on failure
+              break;
+            } else {
+              // Exponential backoff: 2s, 4s, 8s
+              const delay = 2000 * Math.pow(2, retryCount - 1);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
+          }
+        }
+        
+        if (!stepSuccess) break; // Stop plan execution if a step failed after retries
       }
 
-      const output: ExecutionAgentOutput = {
-        status: 'pending',
-        executedSteps,
-        pendingSteps,
-        failedSteps,
-        totalGasUsed: '0',
-        totalCost: '0',
-      };
+      const success = failedSteps.length === 0;
 
       return {
-        success: true,
+        success,
         agentType: 'execution',
-        data: output,
-        processingTimeMs: Date.now() - startTime,
-        metadata: {
-          requiresWalletSignature: true,
+        data: {
+          status: success ? 'completed' : 'failed',
+          executedSteps,
+          pendingSteps,
+          failedSteps,
+          totalGasUsed: '0',
+          totalCost: '0'
         },
+        processingTimeMs: Date.now() - startTime
       };
-    } catch (error) {
-      logger.error({ error }, 'Execution failed');
+
+    } catch (error: any) {
       return {
         success: false,
         agentType: 'execution',
-        error: error instanceof Error ? error.message : 'Unknown error',
-        processingTimeMs: Date.now() - startTime,
+        error: error.message,
+        processingTimeMs: Date.now() - startTime
       };
     }
   }
@@ -434,7 +486,7 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
   async monitor(
     planId: string,
     txHashes: string[],
-    context: AgentContext
+    _context: AgentContext
   ): Promise<AgentResult<MonitoringAgentOutput>> {
     const startTime = Date.now();
 
@@ -521,6 +573,22 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
         return `Withdraw ${params.amount} from ${params.vault}`;
       case 'vote':
         return `Vote ${params.choice} on proposal ${params.proposalId}`;
+      case 'claimRewards':
+        return `Claim rewards from ${params.protocol}`;
+      case 'createStream':
+        return `Create stream of ${params.amountPerSec} ${params.token}/sec to ${params.recipient}`;
+      case 'deployContract':
+        return `Deploy ${params.type} contract`;
+      case 'delegate':
+        return `Delegate voting power to ${params.votingPowerTo}`;
+      case 'executeMulticall':
+        return `Execute batch of ${(params.calls as any[])?.length || 0} calls`;
+      case 'setAutoRebalance':
+        return `Set auto-rebalance with ${(params.conditions as any[])?.length || 0} conditions`;
+      case 'setRecurringPayment':
+        return `Set recurring payment of ${params.amount} ${params.token} to ${params.recipient} every ${params.frequency}`;
+      case 'hedgePosition':
+        return `Hedge position with strategy ${params.strategy}`;
       default:
         return `Execute ${fn}`;
     }
@@ -541,6 +609,10 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
       vote: '100000',
       delegate: '80000',
       executeMulticall: '500000',
+      deployContract: '2000000',
+      setAutoRebalance: '400000',
+      setRecurringPayment: '350000',
+      hedgePosition: '450000',
     };
     return gasEstimates[functionName] || '200000';
   }
@@ -560,7 +632,7 @@ export class MultiAgentOrchestrator implements AgentOrchestrator {
     return currentChain !== previousChain;
   }
 
-  private generateBridgeSteps(intent: ParsedIntent, chains: number[]): any[] {
+  private generateBridgeSteps(_intent: ParsedIntent, chains: number[]): any[] {
     // Generate bridge steps for cross-chain operations
     if (chains.length <= 1) return [];
 

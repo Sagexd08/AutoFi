@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { z } from 'zod';
-import { CeloClient } from '@celo-automator/celo-functions';
-import { RiskEngine } from '@celo-ai/risk-engine';
+import { CeloClient } from '@autofi/celo-functions';
+import { RiskEngine } from '@autofi/risk-engine';
 import { logger } from '../utils/logger.js';
 import type { Address } from 'viem';
 

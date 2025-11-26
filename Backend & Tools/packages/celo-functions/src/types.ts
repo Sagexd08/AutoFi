@@ -6,4 +6,4 @@ export type {
   EventFilter,
   ContractCall,
   DeploymentResult,
-} from '@celo-automator/types';
+} from '@autofi/types';

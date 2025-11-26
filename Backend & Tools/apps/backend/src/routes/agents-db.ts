@@ -6,8 +6,8 @@ import {
   type AgentType,
   type ExecutionMode,
 } from '@autofi/database';
-import { LangChainAgent } from '@celo-automator/langchain-agent';
-import { CeloClient } from '@celo-automator/celo-functions';
+import { LangChainAgent } from '@autofi/langchain-agent';
+import { CeloClient } from '@autofi/celo-functions';
 import { RiskEngine } from '@autofi/risk-engine';
 import type { TransactionContext } from '@autofi/risk-engine';
 import type { Address } from 'viem';

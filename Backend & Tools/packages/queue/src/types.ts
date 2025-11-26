@@ -34,11 +34,12 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
 };
 
 export const QUEUE_NAMES = {
-  WORKFLOW: 'autofi:workflow',
-  TRANSACTION: 'autofi:transaction',
-  SIMULATION: 'autofi:simulation',
-  NOTIFICATION: 'autofi:notification',
-  SCHEDULED: 'autofi:scheduled',
+  WORKFLOW: 'autofi-workflow',
+  TRANSACTION: 'autofi-transaction',
+  SIMULATION: 'autofi-simulation',
+  NOTIFICATION: 'autofi-notification',
+  SCHEDULED: 'autofi-scheduled',
+  PLAN_EXECUTION: 'autofi-plan-execution',
 } as const;
 
 export type QueueName = typeof QUEUE_NAMES[keyof typeof QUEUE_NAMES];

@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import { CeloClient } from '@celo-automator/celo-functions';
+import { CeloClient } from '@autofi/celo-functions';
 import { logger } from '../utils/logger.js';
 
 const router: Router = express.Router();

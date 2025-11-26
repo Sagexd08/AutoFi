@@ -38,10 +38,10 @@ export const transactionQueue = new Queue<TransactionJobData, TransactionJobResu
     defaultJobOptions: {
       removeOnComplete: { count: 2000 },
       removeOnFail: { count: 5000 },
-      attempts: 3,
+      attempts: 4, // 2s, 4s, 8s, 16s (close enough to 30s max)
       backoff: {
         type: 'exponential',
-        delay: 3000, // 3s, 6s, 12s
+        delay: 2000, // Starts at 2s -> 4s -> 8s
       },
     },
   }

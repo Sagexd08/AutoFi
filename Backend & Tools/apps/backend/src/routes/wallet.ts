@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
-import { CeloClient } from '@celo-automator/celo-functions';
-import { getBalance, getTokenBalance } from '@celo-automator/celo-functions';
-import { AddressSchema } from '@celo-automator/core';
+import { CeloClient } from '@autofi/celo-functions';
+import { getBalance, getTokenBalance } from '@autofi/celo-functions';
+import { AddressSchema } from '@autofi/core';
 import type { Address } from 'viem';
 
 const router: Router = express.Router();

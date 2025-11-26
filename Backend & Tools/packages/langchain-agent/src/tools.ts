@@ -1,6 +1,6 @@
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
-import type { CeloClient } from '@celo-automator/celo-functions';
+import type { CeloClient } from '@autofi/celo-functions';
 import {
   getBalance,
   getTokenBalance,
@@ -9,7 +9,7 @@ import {
   callContract,
   readContract,
   getTransactionStatus,
-} from '@celo-automator/celo-functions';
+} from '@autofi/celo-functions';
 import type { Address, Hash } from 'viem';
 
 export function createTools(celoClient?: CeloClient) {

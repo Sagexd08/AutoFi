@@ -28,7 +28,7 @@
   "author": "Celo AI Agents Team",
   "license": "MIT",
   "dependencies": {
-    "@celo-automator/types": "workspace:*",
+    "@autofi/types": "workspace:*",
     "zod": "^3.22.4"
   },
   "devDependencies": {

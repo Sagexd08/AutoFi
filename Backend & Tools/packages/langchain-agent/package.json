@@ -1,5 +1,5 @@
 {
-  "name": "@celo-automator/langchain-agent",
+  "name": "@autofi/langchain-agent",
   "version": "2.0.0",
   "description": "Advanced LangChain-powered AI workflow orchestrator for Celo automation",
   "main": "./dist/index.js",
@@ -22,8 +22,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@celo-automator/types": "workspace:*",
-    "@celo-automator/celo-functions": "workspace:*",
+    "@autofi/types": "workspace:*",
+    "@autofi/celo-functions": "workspace:*",
     "@langchain/core": "^0.3.0",
     "@langchain/google-genai": "^0.0.24",
     "langchain": "^0.3.0",

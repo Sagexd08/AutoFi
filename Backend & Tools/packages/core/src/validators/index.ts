@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { isValidAddress } from '../utils/index.js';
-import type { Workflow } from '@celo-automator/types';
+import type { Workflow } from '@autofi/types';
 
 export const AddressSchema = z.string().refine(isValidAddress, {
   message: 'Invalid address format',

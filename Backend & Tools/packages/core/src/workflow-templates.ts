@@ -1,6 +1,6 @@
 import { writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
-import type { WorkflowTemplate } from '@celo-automator/types';
+import type { WorkflowTemplate } from '@autofi/types';
 
 export const workflowTemplates: WorkflowTemplate[] = [
   {

@@ -7,8 +7,8 @@ import {
   type TransactionStatus,
   type RiskLevel,
 } from '@autofi/database';
-import { CeloClient } from '@celo-automator/celo-functions';
-import { RiskEngine } from '@celo-ai/risk-engine';
+import { CeloClient } from '@autofi/celo-functions';
+import { RiskEngine } from '@autofi/risk-engine';
 import type { Address } from 'viem';
 import { logger } from '../utils/logger.js';
 import { notificationService } from '../services/notification.js';

@@ -15,7 +15,11 @@ import {
   transactionQueue,
   simulationQueue,
   notificationQueue,
+  QUEUE_NAMES,
+  PlanJobData,
 } from '@autofi/queue';
+import { Job } from 'bullmq';
+import { planExecutionProcessor } from './plan-execution.processor.js';
 import { getChainRegistry } from '@autofi/chain-adapter';
 import { 
   transactionRepository, 
@@ -228,6 +232,14 @@ export async function startWorkers(config: Partial<WorkerConfig> = {}): Promise<
     simulationConcurrency: finalConfig.simulationConcurrency,
     notificationConcurrency: finalConfig.notificationConcurrency,
   });
+
+  // Register Plan Execution Processor
+  const manager = createQueueManager();
+  manager.registerWorker<PlanJobData, any>(
+    QUEUE_NAMES.PLAN_EXECUTION,
+    (job: Job<PlanJobData>) => planExecutionProcessor.process(job),
+    { concurrency: 3 }
+  );
 
   // Set up job event handlers
   await setupJobEventHandlers();

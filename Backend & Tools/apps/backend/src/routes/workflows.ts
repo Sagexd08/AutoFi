@@ -1,9 +1,9 @@
 import express, { Router } from 'express';
-import { LangChainAgent } from '@celo-automator/langchain-agent';
-import { CeloClient } from '@celo-automator/celo-functions';
-import { WorkflowOrchestrator } from '@celo-automator/langchain-agent';
-import { validateWorkflow, generateId } from '@celo-automator/core';
-import type { Workflow } from '@celo-automator/types';
+import { LangChainAgent } from '@autofi/langchain-agent';
+import { CeloClient } from '@autofi/celo-functions';
+import { WorkflowOrchestrator } from '@autofi/langchain-agent';
+import { validateWorkflow, generateId } from '@autofi/core';
+import type { Workflow } from '@autofi/types';
 import { logger } from '../utils/logger.js';
 
 const router: Router = express.Router();

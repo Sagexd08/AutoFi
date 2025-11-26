@@ -14,12 +14,12 @@
     "test": "node -e \"console.log('No tests for @autofi/backend yet');\""
   },
   "dependencies": {
-    "@celo-automator/types": "workspace:*",
-    "@celo-automator/core": "workspace:*",
-    "@celo-automator/langchain-agent": "workspace:*",
-    "@celo-automator/celo-functions": "workspace:*",
+    "@autofi/types": "workspace:*",
+    "@autofi/core": "workspace:*",
+    "@autofi/langchain-agent": "workspace:*",
+    "@autofi/celo-functions": "workspace:*",
     "@autofi/agents": "workspace:*",
-    "@celo-ai/risk-engine": "workspace:*",
+    "@autofi/risk-engine": "workspace:*",
     "@autofi/database": "workspace:*",
     "@autofi/chain-adapter": "workspace:*",
     "@autofi/queue": "workspace:*",

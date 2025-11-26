@@ -5,7 +5,7 @@ import {
   HumanMessagePromptTemplate,
 } from '@langchain/core/prompts';
 import { LangChainAgent } from './agent.js';
-import type { Workflow } from '@celo-automator/types';
+import type { Workflow } from '@autofi/types';
 
 const WORKFLOW_SYSTEM_PROMPT = `You are an advanced AI workflow orchestrator for Celo blockchain automation.
 

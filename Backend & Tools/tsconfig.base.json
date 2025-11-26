@@ -19,7 +19,7 @@
     "noFallthroughCasesInSwitch": true,
     "allowSyntheticDefaultImports": true,
     "paths": {
-      "@celo-automator/types": ["./packages/types/src"],
+      "@autofi/types": ["./packages/types/src"],
       "@celo-automator/core": ["./packages/core/src"],
       "@celo-automator/langchain-agent": ["./packages/langchain-agent/src"],
       "@celo-automator/celo-functions": ["./packages/celo-functions/src"]

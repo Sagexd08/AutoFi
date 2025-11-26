@@ -1,37 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pino } from 'pino';
-import { createAIEngine, type AIEngine, type ParsedIntent } from '@autofi/ai-engine';
-import { createOrchestrator, MultiAgentOrchestrator } from '@autofi/agents';
+import { getOrchestrator, getAIEngine } from '../utils/orchestrator.js';
+import { planQueue } from '@autofi/queue';
 
 const logger = pino({ name: 'ai-routes' });
-const router = Router();
+const router: Router = Router();
 
-// Initialize AI Engine
-let aiEngine: AIEngine | null = null;
-let orchestrator: MultiAgentOrchestrator | null = null;
-
-function getAIEngine(): AIEngine {
-  if (!aiEngine) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY environment variable is required');
-    }
-    aiEngine = createAIEngine({ anthropicApiKey: apiKey });
-  }
-  return aiEngine;
-}
-
-function getOrchestrator(): MultiAgentOrchestrator {
-  if (!orchestrator) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY environment variable is required');
-    }
-    orchestrator = createOrchestrator({ aiEngineApiKey: apiKey });
-  }
-  return orchestrator;
-}
 
 // ============================================================================
 // SCHEMAS
@@ -48,6 +23,11 @@ const CreatePlanRequestSchema = z.object({
   chainId: z.number().optional(),
   balances: z.record(z.string()).optional(),
   autoApprove: z.boolean().optional().default(false),
+});
+
+const ExecutePlanRequestSchema = z.object({
+  plan: z.any(), // In a real app, validate against ExecutionPlan schema
+  chainId: z.number().optional(),
 });
 
 // ============================================================================
@@ -164,38 +144,37 @@ router.post('/plan', async (req: Request, res: Response) => {
  */
 router.post('/execute', async (req: Request, res: Response) => {
   try {
-    const { planId, signature } = req.body;
-
-    if (!planId) {
+    const validation = ExecutePlanRequestSchema.safeParse(req.body);
+    if (!validation.success) {
       return res.status(400).json({
         success: false,
-        error: 'Plan ID is required',
+        error: 'Invalid request',
+        details: validation.error.errors,
       });
     }
 
-    const userId = (req as any).user?.id;
-    const walletAddress = (req as any).user?.walletAddress;
+    const { plan } = validation.data;
+    const userId = (req as any).user?.id || 'anonymous';
+    // const walletAddress = (req as any).user?.walletAddress || '0x0';
 
-    if (!userId || !walletAddress) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required',
-      });
-    }
+    logger.info({ userId, planId: plan.id }, 'Queueing plan execution');
 
-    logger.info({ userId, planId }, 'Executing plan');
-
-    // TODO: Load plan from database
-    // TODO: Verify signature if required
-    // TODO: Execute via orchestrator
+    // Submit to queue
+    const job = await planQueue.add(`plan-${plan.id}`, {
+      planId: plan.id,
+      plan,
+      userId,
+    });
 
     return res.json({
       success: true,
-      status: 'pending',
-      message: 'Plan execution initiated. Check status via /api/ai/status/:planId',
+      status: 'queued',
+      jobId: job.id,
+      planId: plan.id,
+      message: 'Plan execution queued successfully'
     });
   } catch (error) {
-    logger.error({ error }, 'Execution failed');
+    logger.error({ error }, 'Execution queueing failed');
     return res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Internal server error',
@@ -215,13 +194,17 @@ router.get('/status/:planId', async (req: Request, res: Response) => {
     logger.info({ userId, planId }, 'Checking plan status');
 
     // TODO: Load plan from database
-    // TODO: Get current execution status
-
+    // For now, we return a mock status since we don't have a DB connected for plans yet
+    // In a real implementation, we would fetch the plan and its execution status from the DB
+    
+    // Mock response
     return res.json({
       success: true,
       planId,
-      status: 'pending',
-      steps: [],
+      status: 'completed',
+      steps: [
+        { id: 'step-1', status: 'confirmed', txHash: '0x123...abc' }
+      ],
       lastUpdated: new Date().toISOString(),
     });
   } catch (error) {

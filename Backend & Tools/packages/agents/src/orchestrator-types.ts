@@ -1,7 +1,4 @@
-import { pino } from 'pino';
-import type { ParsedIntent, PlanStep } from '@autofi/ai-engine';
-
-const logger = pino({ name: 'agent-orchestrator' });
+import type { ParsedIntent } from '@autofi/ai-engine';
 
 // ============================================================================
 // AGENT TYPES
@@ -262,10 +259,11 @@ export interface ExecutionAgentOutput {
 
 export interface ExecutedStep {
   stepId: string;
-  txHash: string;
-  blockNumber: number;
-  gasUsed: string;
-  status: 'confirmed' | 'pending';
+  txHash?: string;
+  jobId?: string;
+  blockNumber?: number;
+  gasUsed?: string;
+  status: 'confirmed' | 'pending' | 'queued';
 }
 
 export interface FailedStep {
@@ -331,6 +329,14 @@ export interface OrchestratorConfig {
   riskEngineConfig?: RiskEngineConfig;
   simulationConfig?: SimulationConfig;
   executionConfig?: ExecutionConfig;
+  walletConfig?: {
+    type: 'local' | 'privy' | 'fireblocks';
+    privateKey?: string;
+    privyAppId?: string;
+    privyAppSecret?: string;
+    fireblocksApiKey?: string;
+    fireblocksSecretKey?: string;
+  };
 }
 
 export interface RiskEngineConfig {

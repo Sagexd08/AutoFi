@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LangChainAgent } from './agent.js';
 import { WorkflowOrchestrator } from './orchestrator.js';
 import { CeloClient } from '@celo-automator/celo-functions';
-import type { Workflow } from '@celo-automator/types';
+import type { Workflow } from '@autofi/types';
 import { isSuccessResult, hasTransactionHash } from './memory.js';
 
 describe('LangChainAgent - Advanced', () => {

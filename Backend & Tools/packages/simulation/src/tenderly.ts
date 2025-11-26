@@ -68,7 +68,7 @@ export class TenderlySimulator {
         tenderlyRequest
       );
 
-      return this.parseSimulationResponse([response], request);
+      return this.parseSimulationResponse([response]);
     } catch (error) {
       logger.error({ error }, 'Simulation failed');
       return this.emptyResult(error instanceof Error ? error.message : 'Unknown error');
@@ -108,7 +108,7 @@ export class TenderlySimulator {
         bundleRequest
       );
 
-      return this.parseSimulationResponse(response.simulation_results, request);
+      return this.parseSimulationResponse(response.simulation_results);
     } catch (error) {
       logger.error({ error }, 'Bundle simulation failed');
       return this.emptyResult(error instanceof Error ? error.message : 'Unknown error');
@@ -198,8 +198,7 @@ export class TenderlySimulator {
   }
 
   private parseSimulationResponse(
-    responses: TenderlySimulationResponse[],
-    request: SimulationRequest
+    responses: TenderlySimulationResponse[]
   ): SimulationResult {
     const steps: StepSimulationResult[] = [];
     const allBalanceChanges: BalanceChange[] = [];

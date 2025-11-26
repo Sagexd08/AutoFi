@@ -1,9 +1,9 @@
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import type { AgentConfig } from '@celo-automator/types';
+import type { AgentConfig } from '@autofi/types';
 import { BufferMemory } from './memory.js';
 import { createTools } from './tools.js';
-import type { CeloClient } from '@celo-automator/celo-functions';
+import type { CeloClient } from '@autofi/celo-functions';
 
 export interface LangChainAgentConfig extends AgentConfig {
   geminiApiKey?: string;

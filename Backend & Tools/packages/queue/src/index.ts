@@ -14,6 +14,9 @@ export type { SimulationJobData, SimulationJobResult } from './queues/simulation
 export { notificationQueue } from './queues/notification.queue.js';
 export type { NotificationJobData } from './queues/notification.queue.js';
 
+export { planQueue } from './queues/plan.queue.js';
+export type { PlanJobData, PlanJobResult } from './queues/plan.queue.js';
+
 // Processors
 export * from './processors/index.js';
 

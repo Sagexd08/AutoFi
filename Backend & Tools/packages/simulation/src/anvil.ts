@@ -1,5 +1,4 @@
-import { createPublicClient, http, PublicClient, createWalletClient, Hex } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
+import { createPublicClient, http, PublicClient } from 'viem';
 import { mainnet, polygon, arbitrum, optimism, base, avalanche, bsc, celo, scroll, zkSync, linea, mantle } from 'viem/chains';
 import { pino } from 'pino';
 import {
@@ -52,10 +51,10 @@ export class AnvilSimulator {
     this.client = createPublicClient({
       chain,
       transport: http(this.rpcUrl),
-    });
+    }) as PublicClient;
 
     try {
-      const blockNumber = await this.client.getBlockNumber();
+      const blockNumber = await this.client!.getBlockNumber();
       logger.info({ chainId, blockNumber }, 'Connected to Anvil');
     } catch (error) {
       logger.error({ error }, 'Failed to connect to Anvil');
@@ -144,7 +143,7 @@ export class AnvilSimulator {
         success: true,
         gasUsed,
         gasLimit: tx.gasLimit || '8000000',
-        returnData: result,
+        returnData: result.data || '0x',
         logs: [],
         balanceChanges: [],
       };
