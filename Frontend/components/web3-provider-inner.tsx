@@ -8,6 +8,7 @@ import { config } from '@/lib/wagmi-config'
 
 import '@rainbow-me/rainbowkit/styles.css'
 
+// Create query client outside component to prevent recreation
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -18,16 +19,7 @@ const queryClient = new QueryClient({
 })
 
 export function Web3ProviderInner({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = React.useState(false)
-
-  React.useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return <>{children}</>
-  }
-
+  // Always wrap with providers - RainbowKit handles hydration internally
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>

@@ -9,7 +9,7 @@ import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { useStore } from "@/lib/store"
+import { useAccount } from "wagmi"
 import { blockchainIntegration } from "@/lib/blockchain-integration"
 import { Button } from "@/components/ui/button"
 import {
@@ -61,7 +61,7 @@ export function NFTMinter() {
   const [loading, setLoading] = useState(false)
   const [minted, setMinted] = useState<{ tokenId: string; txHash: string } | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
-  const { wallet } = useStore()
+  const { address, isConnected } = useAccount()
 
   const form = useForm<NFTFormData>({
     resolver: zodResolver(nftSchema),
@@ -70,16 +70,16 @@ export function NFTMinter() {
       description: "",
       imageUrl: "",
       attributes: [],
-      recipient: wallet.address || "",
+      recipient: address || "",
     },
   })
 
   // Update recipient when wallet changes
   useEffect(() => {
-    if (wallet.address) {
-      form.setValue('recipient', wallet.address)
+    if (address) {
+      form.setValue('recipient', address)
     }
-  }, [wallet.address, form])
+  }, [address, form])
 
   // Preview image
   const imageUrl = form.watch('imageUrl')
@@ -90,7 +90,7 @@ export function NFTMinter() {
   }, [imageUrl])
 
   const onSubmit = async (data: NFTFormData) => {
-    if (!wallet.address) return
+    if (!address) return
 
     setLoading(true)
     try {
@@ -104,7 +104,7 @@ export function NFTMinter() {
 
       // Mint NFT
       const txHash = await blockchainIntegration.mintNFT(
-        data.recipient || wallet.address,
+        data.recipient || address,
         data.imageUrl,
         metadata
       )
@@ -332,7 +332,7 @@ export function NFTMinter() {
             {/* Submit */}
             <Button
               type="submit"
-              disabled={loading || !wallet.isConnected}
+              disabled={loading || !isConnected}
               className="w-full flex items-center justify-center gap-2"
             >
               {loading && <Loader2 size={20} className="animate-spin" />}

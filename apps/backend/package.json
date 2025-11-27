@@ -18,6 +18,7 @@
     "@celo-automator/core": "workspace:*",
     "@celo-automator/langchain-agent": "workspace:*",
     "@celo-automator/celo-functions": "workspace:*",
+    "@celo-automator/vector-db": "workspace:*",
     "@celo-ai/agents": "workspace:*",
     "@celo-ai/risk-engine": "workspace:*",
     "express": "^4.21.1",

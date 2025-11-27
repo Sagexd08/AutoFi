@@ -9,7 +9,8 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { useStore } from "@/lib/store"
+import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from "wagmi"
+import { parseEther } from "viem"
 import { blockchainIntegration } from "@/lib/blockchain-integration"
 import { Button } from "@/components/ui/button"
 import {
@@ -61,7 +62,8 @@ export function TransactionBuilder({ onSuccess }: TransactionBuilderProps) {
   const [gasEstimate, setGasEstimate] = useState<{ gasLimit: string; gasPrice: string } | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
   const [txStatus, setTxStatus] = useState<'pending' | 'success' | 'failed' | null>(null)
-  const { wallet } = useStore()
+  const { address, isConnected } = useAccount()
+  const { sendTransactionAsync } = useSendTransaction()
 
   const form = useForm<TransactionFormData>({
     resolver: zodResolver(transactionSchema),
@@ -94,16 +96,15 @@ export function TransactionBuilder({ onSuccess }: TransactionBuilderProps) {
   }
 
   const onSubmit = async (data: TransactionFormData) => {
-    if (!wallet.address) return
+    if (!address) return
 
     setLoading(true)
     setTxStatus('pending')
     try {
-      const hash = await blockchainIntegration.sendTransaction(
-        data.to,
-        data.value,
-        undefined
-      )
+      const hash = await sendTransactionAsync({
+        to: data.to as `0x${string}`,
+        value: parseEther(data.value),
+      })
       
       setTxHash(hash)
       setTxStatus('success')
@@ -340,7 +341,7 @@ export function TransactionBuilder({ onSuccess }: TransactionBuilderProps) {
             >
               <Button
                 type="submit"
-                disabled={loading || !wallet.isConnected}
+                disabled={loading || !isConnected}
                 className="flex-1 flex items-center justify-center gap-2"
               >
                 {loading && <Loader2 size={20} className="animate-spin" />}

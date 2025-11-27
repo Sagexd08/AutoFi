@@ -1,16 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Navbar from "@/components/navbar"
 import { TransactionBuilder } from "@/components/blockchain/transaction-builder"
 import { SwapInterface } from "@/components/blockchain/swap-interface"
 import { NFTMinter } from "@/components/blockchain/nft-minter"
 import { DAOGovernance } from "@/components/blockchain/dao-governance"
 import PromptModal from "@/components/templates/prompt-modal"
-import { useStore } from "@/lib/store"
-import { useWallet } from "@/hooks/use-wallet"
 import { useRealtimeUpdates } from "@/hooks/use-realtime-updates"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAccount } from "wagmi"
+import { ConnectButton } from "@rainbow-me/rainbowkit"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -30,9 +30,13 @@ import {
 export default function Tools() {
   const [activeTab, setActiveTab] = useState("transactions")
   const [isPromptModalOpen, setIsPromptModalOpen] = useState(false)
-  const { wallet } = useStore()
-  const { wallet: walletState } = useWallet()
-  const { isConnected, lastUpdate, updates } = useRealtimeUpdates()
+  const [mounted, setMounted] = useState(false)
+  const { isConnected: walletConnected, address } = useAccount()
+  const { isConnected: realtimeConnected, lastUpdate, updates } = useRealtimeUpdates()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const tools = [
     {
@@ -69,7 +73,20 @@ export default function Tools() {
     }
   ]
 
-  if (!wallet.isConnected) {
+  // Show loading state before hydration
+  if (!mounted) {
+    return (
+      <main className="min-h-screen bg-background">
+        <div className="h-16 bg-muted/20 animate-pulse" />
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="h-8 w-48 bg-muted/20 animate-pulse rounded mb-6" />
+          <div className="h-64 bg-muted/20 animate-pulse rounded" />
+        </div>
+      </main>
+    )
+  }
+
+  if (!walletConnected) {
     return (
       <main className="min-h-screen bg-background">
         <Navbar />
@@ -83,6 +100,7 @@ export default function Tools() {
           <p className="text-muted-foreground mb-8">
             Connect your wallet to access powerful blockchain automation tools
           </p>
+          <ConnectButton />
         </motion.div>
       </main>
     )
@@ -122,9 +140,9 @@ export default function Tools() {
                   Create Automation
                 </Button>
               </motion.div>
-              <Badge variant={isConnected ? "default" : "secondary"}>
+              <Badge variant={realtimeConnected ? "default" : "secondary"}>
                 <Activity size={12} className="mr-1" />
-                {isConnected ? "Live" : "Offline"}
+                {realtimeConnected ? "Live" : "Offline"}
               </Badge>
               {lastUpdate && (
                 <Badge variant="outline">

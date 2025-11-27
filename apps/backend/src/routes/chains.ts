@@ -1,4 +1,4 @@
-import express, { Router } from 'express';
+import express, { Router, Request, Response } from 'express';
 import { CeloClient } from '@celo-automator/celo-functions';
 import { logger } from '../utils/logger.js';
 
@@ -8,7 +8,7 @@ const startTime = Date.now();
 
 let celoClient: CeloClient | undefined;
 
-function ensureCeloClient() {
+function ensureCeloClient(): void {
   if (!celoClient && process.env.CELO_PRIVATE_KEY) {
     celoClient = new CeloClient({
       privateKey: process.env.CELO_PRIVATE_KEY,
@@ -42,14 +42,14 @@ async function checkChainHealth(chainId: string): Promise<{
       blockNumber: Math.floor(Math.random() * 10000000),
     };
   } catch (error) {
-    logger.error('Chain health check failed', { chainId, error });
+    logger.error('Chain health check failed', { chainId, error: String(error) });
     return {
       healthy: false,
     };
   }
 }
 
-router.get('/health', async (_req, res) => {
+router.get('/health', async (_req: Request, res: Response): Promise<void> => {
   try {
     const uptime = Math.floor((Date.now() - startTime) / 1000);
     const cpuUsage = process.cpuUsage();
@@ -60,7 +60,7 @@ router.get('/health', async (_req, res) => {
 
     const agentCount = 0;
 
-    return res.json({
+    res.json({
       success: true,
       uptime,
       cpu: (cpuUsage.user + cpuUsage.system) / 1000000,
@@ -73,28 +73,28 @@ router.get('/health', async (_req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.error('Health check failed', { error });
-    return res.status(500).json({
+    logger.error('Health check failed', { error: String(error) });
+    res.status(500).json({
       success: false,
       error: 'Health check failed',
     });
   }
 });
 
-router.get('/:chainId/health', async (req, res) => {
+router.get('/:chainId/health', async (req: Request, res: Response): Promise<void> => {
   try {
     const { chainId } = req.params;
     const health = await checkChainHealth(chainId);
 
-    return res.json({
+    res.json({
       success: true,
       chainId,
       ...health,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.error('Chain health check failed', { chainId: req.params.chainId, error });
-    return res.status(500).json({
+    logger.error('Chain health check failed', { chainId: req.params.chainId, error: String(error) });
+    res.status(500).json({
       success: false,
       error: 'Chain health check failed',
     });

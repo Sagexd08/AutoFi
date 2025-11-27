@@ -1,7 +1,6 @@
-import express, { Router } from 'express';
+import express, { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { CeloClient } from '@celo-automator/celo-functions';
-import { RiskEngine } from '@celo-ai/risk-engine';
 import { logger } from '../utils/logger.js';
 import type { Address, Hash } from 'viem';
 
@@ -31,17 +30,8 @@ const deployments = new Map<string, {
 }>();
 
 let celoClient: CeloClient | undefined;
-let riskEngine: RiskEngine | undefined;
 
-function ensureDependencies() {
-  if (!riskEngine) {
-    riskEngine = new RiskEngine({
-      maxRiskScore: process.env.MAX_RISK_SCORE ? Number(process.env.MAX_RISK_SCORE) : 0.95,
-      approvalThreshold: 0.6,
-      blockThreshold: 0.85,
-    });
-  }
-
+function ensureDependencies(): void {
   if (!celoClient && process.env.CELO_PRIVATE_KEY) {
     celoClient = new CeloClient({
       privateKey: process.env.CELO_PRIVATE_KEY,
@@ -51,15 +41,16 @@ function ensureDependencies() {
   }
 }
 
-router.post('/', async (req, res, next) => {
+router.post('/', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     ensureDependencies();
 
     if (!celoClient) {
-      return res.status(503).json({
+      res.status(503).json({
         success: false,
         error: 'Celo client not initialized. CELO_PRIVATE_KEY required.',
       });
+      return;
     }
 
     const parsed = deploySchema.parse(req.body);
@@ -88,7 +79,7 @@ router.post('/', async (req, res, next) => {
       agentId: parsed.agentId,
     });
 
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
       contractAddress: mockAddress,
       transactionHash: mockTxHash,
@@ -98,12 +89,12 @@ router.post('/', async (req, res, next) => {
       metadata: parsed.metadata,
     });
   } catch (error) {
-    logger.error('Contract deployment failed', { error });
-    return next(error);
+    logger.error('Contract deployment failed', { error: String(error) });
+    next(error);
   }
 });
 
-router.get('/:txHash', (req, res) => {
+router.get('/:txHash', (req: Request, res: Response): void => {
   const { txHash } = req.params;
 
   const deployment = Array.from(deployments.values()).find(
@@ -111,13 +102,14 @@ router.get('/:txHash', (req, res) => {
   );
 
   if (!deployment) {
-    return res.status(404).json({
+    res.status(404).json({
       success: false,
       error: 'Deployment not found',
     });
+    return;
   }
 
-  return res.json({
+  res.json({
     success: true,
     deploymentId: deployment.deploymentId,
     contractAddress: deployment.contractAddress,

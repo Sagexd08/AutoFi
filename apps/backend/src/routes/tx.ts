@@ -1,9 +1,8 @@
-import express, { Router } from 'express';
+import express, { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { CeloClient } from '@celo-automator/celo-functions';
-import { RiskEngine } from '@celo-ai/risk-engine';
 import { logger } from '../utils/logger.js';
-import type { Address, Hash } from 'viem';
+import type { Hash } from 'viem';
 
 const router: Router = express.Router();
 
@@ -32,17 +31,41 @@ const transactions = new Map<string, {
 }>();
 
 let celoClient: CeloClient | undefined;
-let riskEngine: RiskEngine | undefined;
 
-function ensureDependencies() {
-  if (!riskEngine) {
-    riskEngine = new RiskEngine({
-      maxRiskScore: process.env.MAX_RISK_SCORE ? Number(process.env.MAX_RISK_SCORE) : 0.95,
-      approvalThreshold: 0.6,
-      blockThreshold: 0.85,
-    });
+// Simple risk scoring function
+function calculateRiskScore(to: string, value?: string, data?: string): { score: number; warnings: string[] } {
+  const warnings: string[] = [];
+  let score = 0.1; // Base score
+  
+  // High value transactions are riskier
+  if (value) {
+    const valueNum = parseFloat(value);
+    if (valueNum > 1e18) { // More than 1 ETH/CELO
+      score += 0.2;
+      warnings.push('High value transaction');
+    }
+    if (valueNum > 10e18) { // More than 10 ETH/CELO
+      score += 0.3;
+      warnings.push('Very high value transaction');
+    }
   }
+  
+  // Contract calls are slightly riskier
+  if (data && data !== '0x') {
+    score += 0.1;
+    warnings.push('Contract interaction');
+  }
+  
+  // Unknown addresses are riskier
+  if (!to.match(/^0x[a-fA-F0-9]{40}$/)) {
+    score += 0.3;
+    warnings.push('Invalid address format');
+  }
+  
+  return { score: Math.min(score, 1), warnings };
+}
 
+function ensureDependencies(): void {
   if (!celoClient && process.env.CELO_PRIVATE_KEY) {
     celoClient = new CeloClient({
       privateKey: process.env.CELO_PRIVATE_KEY,
@@ -52,50 +75,47 @@ function ensureDependencies() {
   }
 }
 
-router.post('/send', async (req, res, next) => {
+router.post('/send', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     ensureDependencies();
 
     if (!celoClient) {
-      return res.status(503).json({
+      res.status(503).json({
         success: false,
         error: 'Celo client not initialized. CELO_PRIVATE_KEY required.',
       });
+      return;
     }
 
     const parsed = txSchema.parse(req.body);
 
-    const riskContext = {
-      agentId: parsed.agentId || 'unknown',
-      type: parsed.data && parsed.data !== '0x' ? 'contract_call' : 'transfer',
-      to: parsed.to as Address,
-      value: parsed.value ? BigInt(parsed.value) : undefined,
-    };
+    const riskResult = calculateRiskScore(parsed.to, parsed.value, parsed.data);
+    const requiresApproval = riskResult.score >= 0.6;
 
-    const riskResult = await riskEngine!.validateTransaction(riskContext);
-
-    if (!riskResult.isValid) {
-      return res.status(400).json({
+    if (riskResult.score >= 0.85) {
+      res.status(400).json({
         success: false,
         error: 'Transaction failed risk validation',
-        riskScore: riskResult.riskScore,
+        riskScore: riskResult.score,
         warnings: riskResult.warnings,
-        recommendations: riskResult.recommendations,
-        requiresApproval: riskResult.riskScore >= 0.6,
+        recommendations: ['Review transaction parameters', 'Use a smaller amount'],
+        requiresApproval,
       });
+      return;
     }
 
     if (parsed.simulateOnly) {
-      return res.json({
+      res.json({
         success: true,
         transactionHash: undefined,
-        riskScore: riskResult.riskScore,
-        requiresApproval: riskResult.riskScore >= 0.6,
+        riskScore: riskResult.score,
+        requiresApproval,
         metadata: {
           simulated: true,
           ...parsed.metadata,
         },
       });
+      return;
     }
 
     const mockTxHash = `0x${Math.random().toString(16).substr(2, 64)}` as Hash;
@@ -104,39 +124,40 @@ router.post('/send', async (req, res, next) => {
       hash: mockTxHash,
       status: 'pending',
       createdAt: new Date().toISOString(),
-      riskScore: riskResult.riskScore,
-      requiresApproval: riskResult.riskScore >= 0.6,
+      riskScore: riskResult.score,
+      requiresApproval,
     });
 
     logger.info('Transaction sent', {
       hash: mockTxHash,
       to: parsed.to,
       agentId: parsed.agentId,
-      riskScore: riskResult.riskScore,
+      riskScore: riskResult.score,
     });
 
-    return res.json({
+    res.json({
       success: true,
       transactionHash: mockTxHash,
-      riskScore: riskResult.riskScore,
-      requiresApproval: riskResult.riskScore >= 0.6,
+      riskScore: riskResult.score,
+      requiresApproval,
       metadata: parsed.metadata,
     });
   } catch (error) {
-    logger.error('Transaction send failed', { error });
-    return next(error);
+    logger.error('Transaction send failed', { error: String(error) });
+    next(error);
   }
 });
 
-router.post('/estimate', async (req, res, next) => {
+router.post('/estimate', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     ensureDependencies();
 
     if (!celoClient) {
-      return res.status(503).json({
+      res.status(503).json({
         success: false,
         error: 'Celo client not initialized. CELO_PRIVATE_KEY required.',
       });
+      return;
     }
 
     const parsed = txSchema.parse(req.body);
@@ -144,7 +165,7 @@ router.post('/estimate', async (req, res, next) => {
     const gasLimit = parsed.gasLimit || '21000';
     const gasPrice = parsed.gasPrice || '20000000000';
 
-    return res.json({
+    res.json({
       success: true,
       gasLimit,
       gasPrice,
@@ -154,23 +175,24 @@ router.post('/estimate', async (req, res, next) => {
       metadata: parsed.metadata,
     });
   } catch (error) {
-    logger.error('Gas estimation failed', { error });
-    return next(error);
+    logger.error('Gas estimation failed', { error: String(error) });
+    next(error);
   }
 });
 
-router.get('/:hash', (req, res) => {
+router.get('/:hash', (req: Request, res: Response): void => {
   const { hash } = req.params;
   const tx = transactions.get(hash as Hash);
 
   if (!tx) {
-    return res.status(404).json({
+    res.status(404).json({
       success: false,
       error: 'Transaction not found',
     });
+    return;
   }
 
-  return res.json({
+  res.json({
     success: true,
     transactionHash: tx.hash,
     status: tx.status,

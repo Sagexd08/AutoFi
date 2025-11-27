@@ -5,7 +5,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useWallet } from "@/hooks/use-wallet"
+import { useAccount, useBalance } from "wagmi"
+import { ConnectButton } from "@rainbow-me/rainbowkit"
 import {
   Card,
   CardContent,
@@ -16,31 +17,62 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { motion } from "framer-motion"
-import { TrendingUp, TrendingDown, DollarSign } from "lucide-react"
+import { TrendingUp, TrendingDown, DollarSign, Wallet } from "lucide-react"
+import { formatEther } from "viem"
+
+interface Token {
+  symbol: string
+  name: string
+  balance: string
+  price?: number
+  address: string
+}
 
 export function TokenDisplay() {
-  const { wallet } = useWallet()
+  const { address, isConnected } = useAccount()
+  const { data: balanceData, isLoading: balanceLoading } = useBalance({ address })
+  const [tokens, setTokens] = useState<Token[]>([])
   const [totalValue, setTotalValue] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    if (wallet.tokens && wallet.tokens.length > 0) {
-      const total = wallet.tokens.reduce((sum, token) => {
-        if (token.price) {
-          return sum + parseFloat(token.balance) * token.price
-        }
-        return sum
-      }, 0)
-      setTotalValue(total)
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (balanceData && isConnected) {
+      // Create a token entry for CELO balance
+      const celoToken: Token = {
+        symbol: balanceData.symbol,
+        name: "Celo",
+        balance: formatEther(balanceData.value),
+        price: 0.5, // You could fetch real price from an API
+        address: "0x0000000000000000000000000000000000000000"
+      }
+      setTokens([celoToken])
+      setTotalValue(parseFloat(celoToken.balance) * (celoToken.price || 0))
       setLoading(false)
     }
-  }, [wallet.tokens])
+  }, [balanceData, isConnected])
 
-  if (!wallet.isConnected) {
+  if (!mounted) {
+    return (
+      <Card className="bg-muted/50">
+        <CardContent className="pt-6">
+          <Skeleton className="h-32 w-full" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!isConnected) {
     return (
       <Card className="bg-muted/50 border-dashed">
-        <CardContent className="pt-6 text-center">
+        <CardContent className="pt-6 text-center flex flex-col items-center gap-4">
+          <Wallet className="h-12 w-12 text-muted-foreground" />
           <p className="text-muted-foreground">Connect your wallet to see your tokens</p>
+          <ConnectButton />
         </CardContent>
       </Card>
     )
@@ -66,13 +98,13 @@ export function TokenDisplay() {
       </CardHeader>
 
       <CardContent>
-        {loading ? (
+        {loading || balanceLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-12 w-full" />
             ))}
           </div>
-        ) : wallet.tokens.length === 0 ? (
+        ) : tokens.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">
             No tokens found in your wallet
           </p>
@@ -82,7 +114,7 @@ export function TokenDisplay() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-            {wallet.tokens.map((token, index) => {
+            {tokens.map((token, index) => {
               const balance = parseFloat(token.balance)
               const value = token.price ? balance * token.price : 0
               const isPositive = value > 0

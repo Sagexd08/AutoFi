@@ -139,7 +139,7 @@ export abstract class BaseAgent implements SpecializedAgent {
     }
 
     const aggregateScore =
-      evaluations.reduce((sum, eval) => sum + eval.riskScore, 0) /
+      evaluations.reduce((sum, evaluation) => sum + evaluation.riskScore, 0) /
       evaluations.length;
 
     return {

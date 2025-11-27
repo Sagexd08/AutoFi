@@ -1,13 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Navbar from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, CheckCircle, AlertCircle } from "lucide-react"
+import { Loader2, CheckCircle, AlertCircle, Wallet } from "lucide-react"
 import axios from "axios"
 import { useAccount } from "wagmi"
+import { ConnectButton } from "@rainbow-me/rainbowkit"
 
 export default function CreateAutomation() {
   const [prompt, setPrompt] = useState("")
@@ -15,7 +16,12 @@ export default function CreateAutomation() {
   const [plan, setPlan] = useState<any>(null)
   const [error, setError] = useState("")
   const [executionStatus, setExecutionStatus] = useState("")
-  const { address, chainId } = useAccount()
+  const [mounted, setMounted] = useState(false)
+  const { address, chainId, isConnected } = useAccount()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const generatePlan = async () => {
     if (!prompt) return
@@ -63,6 +69,41 @@ export default function CreateAutomation() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Show loading skeleton before mount to avoid hydration issues
+  if (!mounted) {
+    return (
+      <main className="min-h-screen bg-background">
+        <div className="h-16 bg-muted/20 animate-pulse" />
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="h-8 w-48 bg-muted/20 animate-pulse rounded mb-6" />
+          <div className="h-64 bg-muted/20 animate-pulse rounded" />
+        </div>
+      </main>
+    )
+  }
+
+  // Show connect wallet prompt if not connected
+  if (!isConnected) {
+    return (
+      <main className="min-h-screen bg-background">
+        <Navbar />
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <h1 className="text-3xl font-bold mb-6">Create Automation</h1>
+          <Card className="mb-8">
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Wallet className="h-16 w-16 text-muted-foreground mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Connect Your Wallet</h2>
+              <p className="text-muted-foreground mb-6 text-center max-w-md">
+                Connect your wallet to create automations and interact with the Celo blockchain.
+              </p>
+              <ConnectButton />
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    )
   }
 
   return (

@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Menu, X, Moon, Sun, Zap, AlertCircle } from "lucide-react"
+import { Menu, X, Moon, Sun, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { useWallet } from "@/hooks/use-wallet"
 import { motion, AnimatePresence } from "framer-motion"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useTheme } from "next-themes"
+import { ConnectButton } from "@rainbow-me/rainbowkit"
+import { useAccount, useSwitchChain } from "wagmi"
+import { celo, celoAlfajores } from "wagmi/chains"
 import {
   Select,
   SelectContent,
@@ -17,35 +19,32 @@ import {
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
-  const [isDark, setIsDark] = useState(true)
-  const [network, setNetwork] = useState("mainnet")
-  const { wallet, isConnecting, error, connect, disconnect, switchToMainnet, switchToTestnet } = useWallet()
+  const [mounted, setMounted] = useState(false)
+  const { theme, setTheme } = useTheme()
+  const { isConnected, chainId } = useAccount()
+  const { switchChain } = useSwitchChain()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const toggleTheme = () => {
-    setIsDark(!isDark)
-    document.documentElement.classList.toggle("dark")
-  }
-
-  const handleWalletClick = () => {
-    if (wallet.isConnected) {
-      disconnect()
-    } else {
-      connect()
-    }
+    setTheme(theme === "dark" ? "light" : "dark")
   }
 
   const handleNetworkChange = async (value: string) => {
-    setNetwork(value)
     try {
       if (value === "mainnet") {
-        await switchToMainnet()
+        switchChain?.({ chainId: celo.id })
       } else {
-        await switchToTestnet()
+        switchChain?.({ chainId: celoAlfajores.id })
       }
     } catch (err) {
       console.error("Network switch error:", err)
     }
   }
+
+  const currentNetwork = chainId === celoAlfajores.id ? "testnet" : "mainnet"
 
   const navLinks = [
     { href: "/dashboard", label: "Dashboard" },
@@ -56,20 +55,6 @@ export default function Navbar() {
 
   return (
     <>
-      {error && (
-        <motion.div
-          className="bg-destructive/10 border-b border-destructive/30 px-4 py-3"
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          exit={{ opacity: 0, height: 0 }}
-        >
-          <Alert variant="destructive" className="max-w-7xl mx-auto">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        </motion.div>
-      )}
-
       <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl transition-smooth">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -109,8 +94,8 @@ export default function Navbar() {
             {/* Right side controls */}
             <div className="flex items-center gap-2 sm:gap-3">
               {/* Network Switcher */}
-              {wallet.isConnected && (
-                <Select value={network} onValueChange={handleNetworkChange}>
+              {mounted && isConnected && (
+                <Select value={currentNetwork} onValueChange={handleNetworkChange}>
                   <SelectTrigger className="w-32 h-10 text-xs">
                     <SelectValue />
                   </SelectTrigger>
@@ -139,46 +124,21 @@ export default function Navbar() {
                 whileTap={{ scale: 0.95 }}
                 aria-label="Toggle theme"
               >
-                {isDark ? (
-                  <Sun size={20} className="text-amber-400" />
+                {mounted ? (
+                  theme === "dark" ? (
+                    <Sun size={20} className="text-amber-400" />
+                  ) : (
+                    <Moon size={20} className="text-slate-600" />
+                  )
                 ) : (
-                  <Moon size={20} className="text-slate-600" />
+                  <div className="w-5 h-5" />
                 )}
               </motion.button>
 
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button
-                  onClick={handleWalletClick}
-                  disabled={isConnecting}
-                  className={`hidden sm:inline-flex transition-smooth hover-lift font-medium rounded-full px-6 ${
-                    wallet.isConnected
-                      ? "bg-success/20 hover:bg-success/30 text-success border border-success/30"
-                      : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/30 border border-primary/50"
-                  }`}
-                >
-                  {isConnecting ? (
-                    <>
-                      <motion.span
-                        className="w-2 h-2 bg-current rounded-full mr-2"
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY }}
-                      />
-                      Connecting...
-                    </>
-                  ) : wallet.isConnected ? (
-                    <>
-                      <motion.span
-                        className="w-2 h-2 bg-success rounded-full mr-2"
-                        animate={{ scale: [1, 1.2, 1] }}
-                        transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
-                      />
-                      {wallet.address?.slice(0, 6)}...{wallet.address?.slice(-4)}
-                    </>
-                  ) : (
-                    "Connect Wallet"
-                  )}
-                </Button>
-              </motion.div>
+              {/* Wallet Connect Button */}
+              <div className="hidden sm:block">
+                {mounted && <ConnectButton showBalance={false} />}
+              </div>
 
               {/* Mobile menu button */}
               <motion.button
@@ -222,14 +182,9 @@ export default function Navbar() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: navLinks.length * 0.05 }}
+                  className="px-4 pt-2"
                 >
-                  <Button
-                    onClick={handleWalletClick}
-                    disabled={isConnecting}
-                    className="w-full mt-2 transition-smooth font-medium rounded-full"
-                  >
-                    {isConnecting ? "Connecting..." : wallet.isConnected ? "✓ Connected" : "Connect Wallet"}
-                  </Button>
+                  {mounted && <ConnectButton showBalance={false} />}
                 </motion.div>
               </motion.div>
             )}

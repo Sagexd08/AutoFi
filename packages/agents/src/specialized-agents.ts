@@ -1,5 +1,4 @@
 import { BaseAgent } from './base-agent.js';
-import type { SpecializedAgentConfig } from './types.js';
 
 export class TreasuryAgent extends BaseAgent {
   protected getSystemPrompt(): string {

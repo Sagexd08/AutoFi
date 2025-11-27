@@ -6,7 +6,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useStore } from "@/lib/store"
+import { useAccount } from "wagmi"
 import { blockchainIntegration } from "@/lib/blockchain-integration"
 import { apiClient } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
@@ -74,7 +74,7 @@ export function DAOGovernance() {
   const [loading, setLoading] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [voting, setVoting] = useState<string | null>(null)
-  const { wallet } = useStore()
+  const { address, isConnected } = useAccount()
 
   // Load proposals
   useEffect(() => {
@@ -104,7 +104,7 @@ export function DAOGovernance() {
   }
 
   const createProposal = async (data: CreateProposalData) => {
-    if (!wallet.address) return
+    if (!address) return
 
     setLoading(true)
     try {
@@ -124,7 +124,7 @@ export function DAOGovernance() {
   }
 
   const voteOnProposal = async (proposalId: string, support: boolean) => {
-    if (!wallet.address) return
+    if (!address) return
 
     setVoting(proposalId)
     try {
@@ -143,7 +143,7 @@ export function DAOGovernance() {
   }
 
   const executeProposal = async (proposalId: string) => {
-    if (!wallet.address) return
+    if (!address) return
 
     setLoading(true)
     try {
@@ -201,7 +201,7 @@ export function DAOGovernance() {
         </div>
         <Button
           onClick={() => setCreateOpen(true)}
-          disabled={!wallet.isConnected}
+          disabled={!isConnected}
         >
           <Plus size={16} className="mr-2" />
           Create Proposal

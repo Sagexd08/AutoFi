@@ -221,6 +221,104 @@ class ApiClient {
     })
   }
 
+  // AI-Powered Intent Parsing
+  async parseIntent(prompt: string, walletAddress: string): Promise<ApiResponse<{
+    action: string
+    tokens: string[]
+    amounts: string[]
+    addresses: string[]
+    conditions: any[]
+    schedule?: any
+    confidence: number
+  }>> {
+    return this.request('/api/ai/parse', {
+      method: 'POST',
+      body: JSON.stringify({ prompt, walletAddress }),
+    })
+  }
+
+  // AI-Powered Execution Plan Generation
+  async generatePlan(prompt: string, walletAddress: string): Promise<ApiResponse<{
+    intent: any
+    plan: {
+      id: string
+      steps: any[]
+      estimatedGas: string
+      risks: any[]
+      recommendations: string[]
+    }
+  }>> {
+    return this.request('/api/ai/plan', {
+      method: 'POST',
+      body: JSON.stringify({ prompt, walletAddress }),
+    })
+  }
+
+  // Execute AI-generated plan
+  async executePlan(plan: any, chainId?: number): Promise<ApiResponse<{
+    jobId: string
+    status: string
+    estimatedTime: string
+  }>> {
+    return this.request('/api/ai/execute', {
+      method: 'POST',
+      body: JSON.stringify({ plan, chainId }),
+    })
+  }
+
+  // Semantic search in user memory
+  async searchMemory(query: string, options?: {
+    walletAddress?: string
+    type?: 'automation' | 'transaction' | 'prompt' | 'context' | 'feedback'
+    limit?: number
+  }): Promise<ApiResponse<any[]>> {
+    return this.request('/api/ai/search', {
+      method: 'POST',
+      body: JSON.stringify({ query, ...options }),
+    })
+  }
+
+  // Store user feedback
+  async storeFeedback(data: {
+    walletAddress: string
+    automationId: string
+    rating: number
+    comment?: string
+  }): Promise<ApiResponse<{ id: string }>> {
+    return this.request('/api/ai/feedback', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  // Get personalized recommendations
+  async getRecommendations(walletAddress: string): Promise<ApiResponse<string[]>> {
+    return this.request(`/api/ai/recommendations/${walletAddress}`)
+  }
+
+  // Get automation history
+  async getAutomationHistory(walletAddress: string, limit?: number): Promise<ApiResponse<any[]>> {
+    return this.request(`/api/ai/history/${walletAddress}?limit=${limit || 20}`)
+  }
+
+  // Get vector DB stats
+  async getVectorDBStats(): Promise<ApiResponse<{
+    totalDocuments: number
+    totalCollections: number
+    dimensions: number
+    memoryUsage: number
+  }>> {
+    return this.request('/api/ai/stats')
+  }
+
+  // Calculate text similarity
+  async calculateSimilarity(text1: string, text2: string): Promise<ApiResponse<{ similarity: number }>> {
+    return this.request('/api/ai/similarity', {
+      method: 'POST',
+      body: JSON.stringify({ text1, text2 }),
+    })
+  }
+
   // Analytics
   async getAnalytics(sessionId?: string): Promise<ApiResponse<{
     totalAutomations: number

@@ -72,7 +72,17 @@ export class AgentFactory {
     this.baseAgent = config.baseAgent;
     this.riskEngine = config.riskEngine;
     this.defaults = config.defaults;
-    this.templates = { ...DEFAULT_TEMPLATES, ...config.templates };
+    // Merge templates with defaults - apply overrides on top of defaults
+    this.templates = Object.keys(DEFAULT_TEMPLATES).reduce((acc, key) => {
+      const agentType = key as SpecializedAgentType;
+      const defaultTemplate = DEFAULT_TEMPLATES[agentType];
+      const override = config.templates?.[agentType];
+      acc[agentType] = {
+        promptPreamble: override?.promptPreamble ?? defaultTemplate.promptPreamble,
+        objectives: override?.objectives ?? defaultTemplate.objectives,
+      };
+      return acc;
+    }, {} as Record<SpecializedAgentType, { promptPreamble: string; objectives: string[] }>);
   }
 
   create(

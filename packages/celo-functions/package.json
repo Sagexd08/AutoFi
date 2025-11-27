@@ -1,6 +1,7 @@
 {
   "name": "@celo-automator/celo-functions",
   "version": "2.0.0",
+  "type": "module",
   "description": "Modular Celo blockchain function library",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

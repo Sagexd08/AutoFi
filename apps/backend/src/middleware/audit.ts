@@ -22,7 +22,7 @@ export function auditLog(entry: Omit<AuditLogEntry, 'timestamp'>): void {
   };
 
   auditLogs.push(logEntry);
-  logger.info('Audit log', logEntry);
+  logger.info('Audit log', { ...logEntry } as Record<string, unknown>);
 
   if (auditLogs.length > 10000) {
     auditLogs.shift();

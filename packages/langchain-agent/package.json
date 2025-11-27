@@ -1,6 +1,7 @@
 {
   "name": "@celo-automator/langchain-agent",
   "version": "2.0.0",
+  "type": "module",
   "description": "Advanced LangChain-powered AI workflow orchestrator for Celo automation",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

@@ -12,10 +12,13 @@ import { chainsRoutes } from './routes/chains.js';
 import { walletRoutes } from './routes/wallet.js';
 import { eventRoutes } from './routes/events.js';
 import { healthRoutes } from './routes/health.js';
+import { aiRoutes } from './routes/ai.js';
 import { logger } from './utils/logger.js';
 import { sanitizeErrorForLogging, generateErrorCode } from './utils/error-sanitizer.js';
 import { setupMetricsRoute } from './middleware/metrics-route.js';
 import { auditMiddleware } from './middleware/audit.js';
+import { vectorDBService } from './services/vector-db.js';
+import { aiService } from './services/ai.js';
 
 dotenv.config();
 
@@ -42,6 +45,7 @@ app.use('/api/chains', chainsRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/ai', aiRoutes);
 
 setupMetricsRoute(app);
 
@@ -93,8 +97,28 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   res.status(statusCode).json(response);
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Celo Automator Backend running on port ${PORT}`);
-  const host = process.env.HOST || 'localhost';
-  console.log(`📖 Health check: http://${host}:${PORT}/api/health`);
-});
+// Initialize services and start server
+async function startServer() {
+  try {
+    // Initialize vector database
+    await vectorDBService.initialize();
+    logger.info('Vector database initialized');
+
+    // Initialize AI service
+    await aiService.initialize();
+    logger.info('AI service initialized');
+
+    app.listen(PORT, () => {
+      console.log(`🚀 Celo Automator Backend running on port ${PORT}`);
+      const host = process.env.HOST || 'localhost';
+      console.log(`📖 Health check: http://${host}:${PORT}/api/health`);
+      console.log(`🧠 AI API: http://${host}:${PORT}/api/ai`);
+      console.log(`📊 Vector DB ready with semantic search`);
+    });
+  } catch (error) {
+    logger.error('Failed to start server', { error });
+    process.exit(1);
+  }
+}
+
+startServer();

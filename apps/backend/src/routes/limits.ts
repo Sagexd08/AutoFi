@@ -1,4 +1,4 @@
-import express, { Router } from 'express';
+import express, { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { logger } from '../utils/logger.js';
 
@@ -23,7 +23,7 @@ const limits = new Map<string, {
   metadata?: Record<string, unknown>;
 }>();
 
-router.post('/', async (req, res, next) => {
+router.post('/', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const parsed = limitSchema.parse(req.body);
     const now = new Date().toISOString();
@@ -44,7 +44,7 @@ router.post('/', async (req, res, next) => {
       perTxLimit: parsed.perTxLimit,
     });
 
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
       agentId: parsed.agentId,
       dailyLimit: parsed.dailyLimit,
@@ -53,23 +53,24 @@ router.post('/', async (req, res, next) => {
       metadata: parsed.metadata,
     });
   } catch (error) {
-    logger.error('Failed to set spending limits', { error });
-    return next(error);
+    logger.error('Failed to set spending limits', { error: String(error) });
+    next(error);
   }
 });
 
-router.get('/:agentId', (req, res) => {
+router.get('/:agentId', (req: Request, res: Response): void => {
   const { agentId } = req.params;
   const limit = limits.get(agentId);
 
   if (!limit) {
-    return res.status(404).json({
+    res.status(404).json({
       success: false,
       error: 'Spending limits not found for agent',
     });
+    return;
   }
 
-  return res.json({
+  res.json({
     success: true,
     agentId: limit.agentId,
     dailyLimit: limit.dailyLimit,

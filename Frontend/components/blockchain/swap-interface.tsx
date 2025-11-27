@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { useStore } from "@/lib/store"
+import { useAccount, useBalance } from "wagmi"
 import { blockchainIntegration } from "@/lib/blockchain-integration"
 import { apiClient } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
@@ -56,7 +56,8 @@ export function SwapInterface() {
   const [loading, setLoading] = useState(false)
   const [quote, setQuote] = useState<SwapQuote | null>(null)
   const [prices, setPrices] = useState<Record<string, number>>({})
-  const { wallet } = useStore()
+  const { address, isConnected } = useAccount()
+  const { data: balanceData } = useBalance({ address })
 
   const form = useForm<SwapFormData>({
     resolver: zodResolver(swapSchema),
@@ -155,7 +156,7 @@ export function SwapInterface() {
   }
 
   const onSubmit = async (data: SwapFormData) => {
-    if (!wallet.address || !quote) return
+    if (!address || !quote) return
 
     setLoading(true)
     try {
@@ -177,9 +178,10 @@ export function SwapInterface() {
   }
 
   const getTokenBalance = (token: string) => {
-    if (!wallet.tokens) return "0"
-    const tokenInfo = wallet.tokens.find(t => t.symbol === token)
-    return tokenInfo?.balance || "0"
+    if (token === 'CELO' && balanceData) {
+      return balanceData.formatted
+    }
+    return "0"
   }
 
   const getTokenPrice = (token: string) => {
@@ -380,7 +382,7 @@ export function SwapInterface() {
             {/* Submit */}
             <Button
               type="submit"
-              disabled={loading || !wallet.isConnected || !quote}
+              disabled={loading || !isConnected || !quote}
               className="w-full flex items-center justify-center gap-2"
             >
               {loading && <Loader2 size={20} className="animate-spin" />}

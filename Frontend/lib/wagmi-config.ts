@@ -21,7 +21,7 @@ const mainnetRpcUrls = [
 // RainbowKit configuration with custom transports
 export const config = getDefaultConfig({
   appName: 'AutoFi',
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'demo-project-id',
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'c0f4cea42bade2f804ee803d1998b5ac',
   chains: [celo, celoAlfajores, mainnet],
   ssr: true,
   transports: {
