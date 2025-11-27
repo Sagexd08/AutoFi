@@ -1,0 +1,25 @@
+{
+    "name": "@autofi/predictive-engine",
+    "version": "1.0.0",
+    "description": "AI-powered predictive intent engine for Autofi",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc --watch",
+        "test": "jest",
+        "lint": "eslint src --ext .ts"
+    },
+    "dependencies": {
+        "@celo-automator/types": "workspace:*",
+        "@celo-automator/core": "workspace:*",
+        "@tensorflow/tfjs-node": "^4.14.0",
+        "zod": "^3.22.4"
+    },
+    "devDependencies": {
+        "@types/node": "^20.10.0",
+        "typescript": "^5.3.0",
+        "jest": "^29.7.0",
+        "ts-jest": "^29.1.0"
+    }
+}
