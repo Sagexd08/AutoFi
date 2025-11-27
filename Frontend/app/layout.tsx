@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
+import { Web3Provider } from "@/components/web3-provider"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
@@ -29,7 +30,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <Web3Provider>
+            {children}
+          </Web3Provider>
           <Toaster richColors closeButton/>
         </ThemeProvider>
         <Analytics />
