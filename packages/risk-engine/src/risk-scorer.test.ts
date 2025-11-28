@@ -529,6 +529,7 @@ describe('RiskEngine', () => {
   describe('Transaction Validation', () => {
     it('should validate a transaction', async () => {
       const result = await riskEngine.validateTransaction({
+        agentId: 'test-agent-1',
         owner: '0x0987654321098765432109876543210987654321',
         to: '0x1234567890123456789012345678901234567890',
         type: 'transfer',
@@ -565,6 +566,7 @@ describe('RiskEngine', () => {
       riskEngine.registerRule(criticalRule);
 
       const result = await riskEngine.validateTransaction({
+        agentId: 'test-agent-1',
         owner: '0x0987654321098765432109876543210987654321',
         to: '0x1234567890123456789012345678901234567890',
         type: 'transfer',
