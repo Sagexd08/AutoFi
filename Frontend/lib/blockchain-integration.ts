@@ -1,68 +1,22 @@
 /**
  * Blockchain Integration Service
  * Connects Frontend with Backend blockchain functionality
+ * 
+ * Types are now imported from @celo-automator/types for consistency
+ * with the backend implementation
  */
 
 import { apiClient } from './api-client'
+import type {
+  BlockchainConfig,
+  TokenInfo,
+  TransactionInfo,
+  AutomationExecution,
+  BlockchainEvent,
+} from '@celo-automator/types'
 
-export interface BlockchainConfig {
-  network: 'mainnet' | 'testnet'
-  rpcUrl: string
-  chainId: number
-  contracts: {
-    agentRegistry: string
-    agentTreasury: string
-    donationSplitter: string
-    yieldAggregator: string
-    masterTrading: string
-    attendanceNFT: string
-  }
-  tokens: {
-    CELO: string
-    cUSD: string
-    cEUR: string
-    cREAL: string
-  }
-}
-
-export interface TokenInfo {
-  address: string
-  symbol: string
-  name: string
-  decimals: number
-  balance: string
-  price?: number
-  value?: number
-}
-
-export interface TransactionInfo {
-  hash: string
-  from: string
-  to: string
-  value: string
-  status: 'pending' | 'success' | 'failed'
-  timestamp: number
-  blockNumber?: number
-  gasUsed?: string
-  gasPrice?: string
-}
-
-export interface AutomationExecution {
-  id: string
-  automationId: string
-  status: 'pending' | 'success' | 'failed'
-  txHash?: string
-  error?: string
-  timestamp: number
-  gasUsed?: string
-  result?: any
-}
-
-export interface BlockchainEvent {
-  type: 'transaction' | 'automation' | 'price' | 'balance'
-  data: any
-  timestamp: number
-}
+// Re-export types for backward compatibility
+export type { BlockchainConfig, TokenInfo, TransactionInfo, AutomationExecution, BlockchainEvent }
 
 class BlockchainIntegration {
   private config: BlockchainConfig
@@ -745,10 +699,3 @@ export const blockchainIntegration = new BlockchainIntegration(
   apiClient
 )
 
-export type {
-  BlockchainConfig,
-  TokenInfo,
-  TransactionInfo,
-  AutomationExecution,
-  BlockchainEvent
-}

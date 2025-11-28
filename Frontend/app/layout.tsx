@@ -5,7 +5,11 @@ import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Web3Provider } from "@/components/web3-provider"
 import { Toaster } from "@/components/ui/sonner"
+import { validateEnvironment } from "@/lib/env"
 import "./globals.css"
+
+// Validate environment variables on app startup
+validateEnvironment()
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })

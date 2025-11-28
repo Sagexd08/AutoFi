@@ -24,10 +24,9 @@ if (process.env.CELO_PRIVATE_KEY) {
 
     agent = new LangChainAgent({
       id: 'main',
-      type: 'langchain',
+      type: 'custom',
       name: 'Celo Automator Agent',
-      model: process.env.AI_MODEL || 'gemini-1.5-flash',
-      geminiApiKey: process.env.GEMINI_API_KEY,
+      model: process.env.AI_MODEL || 'custom-ml-v1',
       celoClient,
     });
 

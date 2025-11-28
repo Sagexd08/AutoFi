@@ -1,12 +1,10 @@
 import {
     createPublicClient,
-    createWalletClient,
     http,
     Address,
     WalletClient,
     PublicClient,
     parseAbi,
-    Chain,
 } from 'viem';
 import { mainnet } from 'viem/chains';
 import {
@@ -29,14 +27,12 @@ export class ApprovalManager {
     private db: AllowanceDatabase;
     private autoRevoke: AutoRevokeSystem;
     private publicClients: Map<number, PublicClient>;
-    private walletClients: Map<number, WalletClient>;
 
     constructor(config?: Partial<ApprovalManagerConfig>) {
         this.config = ApprovalManagerConfigSchema.parse(config || {});
         this.db = new AllowanceDatabase(this.config.databasePath);
         this.autoRevoke = new AutoRevokeSystem(this.db);
         this.publicClients = new Map();
-        this.walletClients = new Map();
 
         if (this.config.autoRevokeAfterUse) {
             this.autoRevoke.start();

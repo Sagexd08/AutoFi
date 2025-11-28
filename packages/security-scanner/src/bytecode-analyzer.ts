@@ -8,7 +8,7 @@ export class BytecodeAnalyzer {
     /**
      * Analyze contract bytecode for security issues
      */
-    static async analyze(bytecode: string, address: string): Promise<SecurityCheck[]> {
+    static async analyze(bytecode: string, _address: string): Promise<SecurityCheck[]> {
         const checks: SecurityCheck[] = [];
 
         // Remove 0x prefix if present

@@ -1,4 +1,3 @@
-import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
 import type { CeloClient } from '@celo-automator/celo-functions';
 import {
@@ -12,13 +11,23 @@ import {
 } from '@celo-automator/celo-functions';
 import type { Address, Hash } from 'viem';
 
-export function createTools(celoClient?: CeloClient) {
+/**
+ * Custom Tool definition (no LangChain dependencies)
+ */
+export interface CustomTool {
+  name: string;
+  description: string;
+  schema: z.ZodSchema;
+  func: (params: Record<string, any>) => Promise<string>;
+}
+
+export function createTools(celoClient?: CeloClient): CustomTool[] {
   if (!celoClient) {
     return [];
   }
 
   return [
-    new DynamicStructuredTool({
+    {
       name: 'get_balance',
       description: 'Get the native CELO balance of a wallet address',
       schema: z.object({
@@ -33,9 +42,9 @@ export function createTools(celoClient?: CeloClient) {
           balanceFormatted: (BigInt(balance) / BigInt(10 ** 18)).toString(),
         });
       },
-    }),
+    },
 
-    new DynamicStructuredTool({
+    {
       name: 'get_token_balance',
       description: 'Get the ERC20 token balance of a wallet address',
       schema: z.object({
@@ -53,9 +62,9 @@ export function createTools(celoClient?: CeloClient) {
           ...balance,
         });
       },
-    }),
+    },
 
-    new DynamicStructuredTool({
+    {
       name: 'send_celo',
       description: 'Send native CELO tokens to an address',
       schema: z.object({
@@ -66,9 +75,9 @@ export function createTools(celoClient?: CeloClient) {
         const result = await sendCELO(celoClient, to as Address, amount);
         return JSON.stringify(result);
       },
-    }),
+    },
 
-    new DynamicStructuredTool({
+    {
       name: 'send_token',
       description: 'Send ERC20 tokens to an address',
       schema: z.object({
@@ -85,9 +94,9 @@ export function createTools(celoClient?: CeloClient) {
         );
         return JSON.stringify(result);
       },
-    }),
+    },
 
-    new DynamicStructuredTool({
+    {
       name: 'call_contract',
       description: 'Call a smart contract function',
       schema: z.object({
@@ -112,9 +121,9 @@ export function createTools(celoClient?: CeloClient) {
         });
         return JSON.stringify(result);
       },
-    }),
+    },
 
-    new DynamicStructuredTool({
+    {
       name: 'read_contract',
       description: 'Read data from a smart contract (view function)',
       schema: z.object({
@@ -142,9 +151,9 @@ export function createTools(celoClient?: CeloClient) {
           });
         }
       },
-    }),
+    },
 
-    new DynamicStructuredTool({
+    {
       name: 'get_transaction_status',
       description: 'Get the status of a transaction by hash',
       schema: z.object({
@@ -157,5 +166,6 @@ export function createTools(celoClient?: CeloClient) {
           ...status,
         });
       },
-    }),
-  ];}
+    },
+  ];
+}

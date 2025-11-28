@@ -1,6 +1,6 @@
 export interface AgentConfig {
   id: string;
-  type: 'langchain' | 'custom';
+  type: 'custom'; // Custom ML engine - no external LLM dependencies
   name: string;
   description?: string;
   model: string;

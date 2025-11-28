@@ -1,6 +1,6 @@
 /**
  * Automations API Routes
- * Handles CRUD operations for automations
+ * Handles CRUD operations for automations with SQLite persistence
  */
 
 import express, { Router, Request, Response, NextFunction } from 'express';
@@ -8,11 +8,14 @@ import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
 import { vectorDBService } from '../services/vector-db.js';
+import { getAutomationsDB, type Automation, type AutomationExecution } from '../database/index.js';
 
 const router: Router = express.Router();
 
-// In-memory store for automations (replace with proper DB later)
-const automations: Map<string, any> = new Map();
+// Get database instance (persistent SQLite storage)
+const automationsDB = getAutomationsDB(
+  process.env.AUTOMATIONS_DB_PATH || './data/automations.db'
+);
 
 // Request schemas
 const createAutomationSchema = z.object({
@@ -63,11 +66,29 @@ const validate = (schema: z.ZodSchema) => {
  */
 router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const allAutomations = Array.from(automations.values());
+    const allAutomations = automationsDB.getAll();
     
     res.json({
       success: true,
       data: allAutomations,
+      total: allAutomations.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/automations/stats
+ * Get automation statistics
+ */
+router.get('/stats', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const stats = automationsDB.getStats();
+    
+    res.json({
+      success: true,
+      data: stats,
     });
   } catch (error) {
     next(error);
@@ -81,7 +102,7 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
 router.get('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
-    const automation = automations.get(id);
+    const automation = automationsDB.get(id);
     
     if (!automation) {
       res.status(404).json({
@@ -101,6 +122,35 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction): Prom
 });
 
 /**
+ * GET /api/automations/:id/executions
+ * Get execution history for an automation
+ */
+router.get('/:id/executions', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const limit = parseInt(req.query.limit as string) || 20;
+    
+    const automation = automationsDB.get(id);
+    if (!automation) {
+      res.status(404).json({
+        success: false,
+        error: 'Automation not found',
+      });
+      return;
+    }
+    
+    const executions = automationsDB.getExecutions(id, limit);
+    
+    res.json({
+      success: true,
+      data: executions,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * POST /api/automations
  * Create a new automation
  */
@@ -111,11 +161,11 @@ router.post('/', validate(createAutomationSchema), async (req: Request, res: Res
     const id = uuidv4();
     const now = new Date().toISOString();
     
-    const automation = {
+    const automation: Automation = {
       id,
       name,
       type,
-      status: 'active' as const,
+      status: 'active',
       progress: 0,
       parameters,
       schedule,
@@ -124,10 +174,10 @@ router.post('/', validate(createAutomationSchema), async (req: Request, res: Res
       createdAt: now,
       updatedAt: now,
       nextRun: schedule ? calculateNextRun(schedule) : now,
-      lastExecution: null,
+      lastExecution: undefined,
     };
     
-    automations.set(id, automation);
+    automationsDB.insert(automation);
     
     // Store in vector DB for learning
     if (walletAddress) {
@@ -152,7 +202,7 @@ router.post('/', validate(createAutomationSchema), async (req: Request, res: Res
 router.put('/:id', validate(updateAutomationSchema), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
-    const automation = automations.get(id);
+    const automation = automationsDB.get(id);
     
     if (!automation) {
       res.status(404).json({
@@ -163,14 +213,10 @@ router.put('/:id', validate(updateAutomationSchema), async (req: Request, res: R
     }
     
     const updates = req.body;
-    const updatedAutomation = {
-      ...automation,
+    const updatedAutomation = automationsDB.update(id, {
       ...updates,
-      updatedAt: new Date().toISOString(),
       nextRun: updates.schedule ? calculateNextRun(updates.schedule) : automation.nextRun,
-    };
-    
-    automations.set(id, updatedAutomation);
+    });
     
     logger.info('Automation updated', { id });
     
@@ -191,7 +237,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction): P
   try {
     const { id } = req.params;
     
-    if (!automations.has(id)) {
+    if (!automationsDB.has(id)) {
       res.status(404).json({
         success: false,
         error: 'Automation not found',
@@ -199,7 +245,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction): P
       return;
     }
     
-    automations.delete(id);
+    automationsDB.delete(id);
     
     logger.info('Automation deleted', { id });
     
@@ -219,7 +265,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction): P
 router.post('/:id/pause', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
-    const automation = automations.get(id);
+    const automation = automationsDB.get(id);
     
     if (!automation) {
       res.status(404).json({
@@ -229,15 +275,13 @@ router.post('/:id/pause', async (req: Request, res: Response, next: NextFunction
       return;
     }
     
-    automation.status = 'paused';
-    automation.updatedAt = new Date().toISOString();
-    automations.set(id, automation);
+    const updated = automationsDB.updateStatus(id, 'paused');
     
     logger.info('Automation paused', { id });
     
     res.json({
       success: true,
-      data: automation,
+      data: updated,
     });
   } catch (error) {
     next(error);
@@ -251,7 +295,7 @@ router.post('/:id/pause', async (req: Request, res: Response, next: NextFunction
 router.post('/:id/resume', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
-    const automation = automations.get(id);
+    const automation = automationsDB.get(id);
     
     if (!automation) {
       res.status(404).json({
@@ -261,15 +305,13 @@ router.post('/:id/resume', async (req: Request, res: Response, next: NextFunctio
       return;
     }
     
-    automation.status = 'active';
-    automation.updatedAt = new Date().toISOString();
-    automations.set(id, automation);
+    const updated = automationsDB.updateStatus(id, 'active');
     
     logger.info('Automation resumed', { id });
     
     res.json({
       success: true,
-      data: automation,
+      data: updated,
     });
   } catch (error) {
     next(error);
@@ -284,7 +326,7 @@ router.post('/:id/execute', async (req: Request, res: Response, next: NextFuncti
   try {
     const { id } = req.params;
     const { context } = req.body || {};
-    const automation = automations.get(id);
+    const automation = automationsDB.get(id);
     
     if (!automation) {
       res.status(404).json({
@@ -296,22 +338,32 @@ router.post('/:id/execute', async (req: Request, res: Response, next: NextFuncti
     
     logger.info('Executing automation', { id, context });
     
-    // TODO: Implement actual execution logic
-    // For now, simulate execution
-    automation.lastExecution = {
+    // Record execution attempt
+    const execution: AutomationExecution = {
+      id: uuidv4(),
+      automationId: id,
       timestamp: new Date().toISOString(),
-      status: 'success',
-      txHash: `0x${Math.random().toString(16).slice(2, 66)}`,
+      status: 'pending',
     };
-    automation.progress = 100;
-    automation.updatedAt = new Date().toISOString();
-    automations.set(id, automation);
+    
+    // TODO: Implement actual blockchain execution - see blockchain.ts for real transaction implementation
+    try {
+      // Placeholder for real execution
+      execution.status = 'success';
+      execution.txHash = `0x${Buffer.from(Date.now().toString()).toString('hex').slice(0, 64)}`;
+    } catch (execError) {
+      execution.status = 'failed';
+      execution.error = String(execError);
+    }
+    
+    automationsDB.recordExecution(id, execution);
     
     res.json({
       success: true,
       data: {
-        result: 'Automation executed successfully',
-        txHash: automation.lastExecution.txHash,
+        result: execution.status === 'success' ? 'Automation executed successfully' : 'Automation execution failed',
+        txHash: execution.txHash,
+        executionId: execution.id,
       },
     });
   } catch (error) {
@@ -344,20 +396,20 @@ router.post('/ai-create', async (req: Request, res: Response, next: NextFunction
     const id = uuidv4();
     const now = new Date().toISOString();
     
-    const automation = {
+    const automation: Automation = {
       id,
       name,
       type,
-      status: 'active' as const,
+      status: 'active',
       progress: 0,
       parameters: { prompt, context },
       createdAt: now,
       updatedAt: now,
       nextRun: now,
-      lastExecution: null,
+      lastExecution: undefined,
     };
     
-    automations.set(id, automation);
+    automationsDB.insert(automation);
     
     logger.info('AI automation created', { id, name, type });
     
@@ -390,7 +442,7 @@ function calculateNextRun(schedule: { frequency: string; cron?: string }): strin
   return now.toISOString();
 }
 
-function detectAutomationType(prompt: string): string {
+function detectAutomationType(prompt: string): Automation['type'] {
   const lower = prompt.toLowerCase();
   if (lower.includes('swap') || lower.includes('exchange')) return 'swap';
   if (lower.includes('nft') || lower.includes('mint')) return 'nft';

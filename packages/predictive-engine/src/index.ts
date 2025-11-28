@@ -325,7 +325,7 @@ export class PredictiveEngine {
     /**
      * Save model and patterns
      */
-    async save(basePath: string): Promise<void> {
+    async save(_basePath: string): Promise<void> {
         if (this.config.modelPath) {
             await this.intentModel.saveModel(this.config.modelPath);
         }

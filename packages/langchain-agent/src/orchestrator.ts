@@ -1,46 +1,10 @@
-import {
-  ChatPromptTemplate,
-  MessagesPlaceholder,
-  SystemMessagePromptTemplate,
-  HumanMessagePromptTemplate,
-} from '@langchain/core/prompts';
 import { LangChainAgent } from './agent.js';
 import type { Workflow } from '@celo-automator/types';
 
-const WORKFLOW_SYSTEM_PROMPT = `You are an advanced AI workflow orchestrator for Celo blockchain automation.
-
-Your role is to:
-1. Interpret natural language automation requests
-2. Convert them into structured JSON workflows
-3. Execute blockchain operations safely and efficiently
-4. Provide clear explanations of your reasoning
-
-You have access to Celo blockchain tools for:
-- Checking balances (CELO and ERC20 tokens)
-- Sending transactions
-- Calling smart contracts
-- Listening to blockchain events
-
-When creating workflows:
-- Always validate addresses and amounts
-- Estimate gas before executing transactions
-- Provide clear error messages if something fails
-- Suggest optimizations when possible
-
-Workflow format:
-{
-  "name": "workflow name",
-  "description": "what this workflow does",
-    "trigger": {
-      "type": "event" | "cron" | "manual" | "condition",
-    },
-    "actions": [
-      {
-        "type": "transfer" | "contract_call" | "notify" | "conditional",
-      }
-    ]
-}`;
-
+/**
+ * Custom Workflow Orchestrator
+ * No external LLM dependencies - uses heuristic-based decision making
+ */
 export class WorkflowOrchestrator {
   private agent: LangChainAgent;
 
@@ -58,34 +22,17 @@ export class WorkflowOrchestrator {
     error?: string;
   }> {
     try {
-      const prompt = ChatPromptTemplate.fromMessages([
-        SystemMessagePromptTemplate.fromTemplate(WORKFLOW_SYSTEM_PROMPT),
-        new MessagesPlaceholder('chat_history'),
-        HumanMessagePromptTemplate.fromTemplate(
-          `User request: {input}\n\nContext: {context}\n\nGenerate a structured workflow JSON. Include an explanation of your reasoning.`
-        ),
-      ]);
-
-      const chain = prompt.pipe(this.agent.getLLM());
-
+      // Parse workflow from natural language using heuristics
+      const workflow = this.parseWorkflowFromText(naturalLanguage, context);
       const memory = this.agent.getMemory();
-      const chatHistory = memory.getChatHistory();
-
-      const response = await chain.invoke({
-        input: naturalLanguage,
-        context: JSON.stringify(context || {}, null, 2),
-        chat_history: chatHistory.slice(-10),
-      });
-
+      
       memory.addMessage('user', naturalLanguage);
-      memory.addMessage('assistant', response.content as string);
-
-      const workflow = this.extractWorkflowFromResponse(response.content as string);
+      memory.addMessage('assistant', JSON.stringify(workflow, null, 2));
 
       return {
         success: true,
         workflow,
-        explanation: response.content as string,
+        explanation: `Parsed workflow: ${workflow.name}. Actions: ${workflow.actions.map(a => a.type).join(', ')}`,
       };
     } catch (error) {
       return {
@@ -145,37 +92,118 @@ export class WorkflowOrchestrator {
   }
 
   async explainWorkflow(workflow: Workflow): Promise<string> {
-    const prompt = ChatPromptTemplate.fromMessages([
-      SystemMessagePromptTemplate.fromTemplate(
-        'You are a helpful assistant that explains blockchain workflows in clear, simple language.'
-      ),
-      HumanMessagePromptTemplate.fromTemplate(
-        'Explain this workflow:\n\n{workflow}\n\nProvide a clear, step-by-step explanation.'
-      ),
-    ]);
-
-    const chain = prompt.pipe(this.agent.getLLM());
-    const response = await chain.invoke({
-      workflow: JSON.stringify(workflow, null, 2),
+    // Generate simple human-readable explanation using heuristics
+    const actionDescriptions = workflow.actions.map(a => {
+      switch (a.type) {
+        case 'transfer':
+          return `Transfer ${a.amount} to ${a.to}`;
+        case 'contract_call':
+          return `Call ${a.functionName} on ${a.contractAddress}`;
+        case 'notify':
+          return 'Send notification';
+        default:
+          return `Execute ${a.type}`;
+      }
     });
 
-    return response.content as string;
+    return `Workflow: ${workflow.name}\n\nSteps:\n${actionDescriptions.map((d, i) => `${i + 1}. ${d}`).join('\n')}`;
   }
 
-  private extractWorkflowFromResponse(response: string): Workflow | undefined {
-    const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/) || response.match(/```\n([\s\S]*?)\n```/);
-    if (jsonMatch) {
-      try {
-        return JSON.parse(jsonMatch[1]) as Workflow;
-      } catch {
+  private parseWorkflowFromText(text: string, context?: Record<string, any>): Workflow {
+    const normalizedText = text.toLowerCase().trim();
+    
+    // Generate workflow name
+    const name = this.extractWorkflowName(normalizedText);
+    
+    // Parse actions using heuristics
+    const actions = this.parseActions(text, context);
+
+    // Determine trigger type
+    const trigger = this.determineTrigger(normalizedText);
+
+    return {
+      name,
+      description: text,
+      trigger,
+      actions,
+      enabled: true,
+    };
+  }
+
+  private extractWorkflowName(text: string): string {
+    // Extract name from patterns like "workflow: name" or use first few words
+    const nameMatch = text.match(/workflow:?\s*([^\n.]+)/i);
+    if (nameMatch) return nameMatch[1].trim();
+    
+    const words = text.split(/\s+/).slice(0, 3).join(' ');
+    return words || 'unnamed-workflow';
+  }
+
+  private determineTrigger(text: string): Workflow['trigger'] {
+    if (/daily|weekly|monthly|every|schedule/i.test(text)) {
+      return {
+        type: 'cron',
+        cron: '0 0 * * *', // Default daily at midnight
+      };
+    }
+    if (/when|if|condition|on event/i.test(text)) {
+      return {
+        type: 'condition',
+        condition: {
+          type: 'custom',
+          operator: 'gt',
+          value: 0,
+        },
+      };
+    }
+    return {
+      type: 'manual',
+    };
+  }
+
+  private parseActions(text: string, _context?: Record<string, any>): Workflow['actions'] {
+    const actions: Workflow['actions'] = [];
+
+    // Parse transfer actions
+    const transferMatch = text.match(/send|transfer|pay\s+(\d+(?:\.\d+)?)\s*(?:to\s+)?([0x\w]+)/gi);
+    if (transferMatch) {
+      for (const match of transferMatch) {
+        const amountMatch = match.match(/(\d+(?:\.\d+)?)/);
+        const addressMatch = match.match(/([0x\w]+)$/);
+        
+        if (amountMatch && addressMatch) {
+          actions.push({
+            type: 'transfer',
+            amount: amountMatch[1],
+            to: addressMatch[1],
+          });
+        }
       }
     }
 
-    try {
-      return JSON.parse(response) as Workflow;
-    } catch {
-      return undefined;
+    // Parse contract call actions
+    if (/call|execute|invoke|interact/i.test(text)) {
+      const contractMatch = text.match(/address:?\s*([0x\w]+)/i);
+      const functionMatch = text.match(/function:?\s*(\w+)/i);
+      
+      if (contractMatch && functionMatch) {
+        actions.push({
+          type: 'contract_call',
+          contractAddress: contractMatch[1],
+          functionName: functionMatch[1],
+          parameters: [],
+        });
+      }
     }
+
+    // If no actions parsed, default to manual trigger
+    if (actions.length === 0) {
+      actions.push({
+        type: 'notify',
+      });
+    }
+
+    return actions;
   }
 
   private async executeAction(action: Workflow['actions'][0]): Promise<{

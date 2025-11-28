@@ -1,0 +1,267 @@
+// Prisma schema for AutoFi Backend
+// Supports SQLite (dev) and PostgreSQL (production)
+// Generated types available at @prisma/client
+
+datasource db {
+  provider = "sqlite"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ============================================================================
+// AUTOMATION MODELS
+// ============================================================================
+
+/// Represents a user's automation workflow
+model Automation {
+  id                String     @id @default(cuid())
+  userId            String     // Address or user ID
+  name              String
+  description       String?
+  enabled           Boolean    @default(true)
+  
+  /// Workflow configuration (JSON serialized)
+  workflowConfig    String     // JSON string of Workflow type
+  
+  /// Risk score (0-100) for this automation
+  riskScore         Int        @default(0)
+  
+  /// Maximum allowed risk score before blocking execution
+  maxRiskScore      Int        @default(50)
+  
+  /// Requires manual approval before execution
+  requiresApproval  Boolean    @default(false)
+  
+  /// Execution history
+  executions        ExecutionHistory[]
+  
+  /// Audit trail
+  auditLogs         AuditLog[]
+  
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  deletedAt         DateTime?  // Soft delete support
+
+  @@index([userId])
+  @@index([enabled])
+  @@index([createdAt])
+}
+
+/// Tracks execution history for automations
+model ExecutionHistory {
+  id                String     @id @default(cuid())
+  
+  automation        Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  automationId      String
+  
+  /// Execution status
+  status            String     // 'pending' | 'running' | 'success' | 'failed' | 'skipped'
+  
+  /// Blockchain transaction hash (if applicable)
+  transactionHash   String?
+  
+  /// Block number where transaction was mined
+  blockNumber       Int?
+  
+  /// Error message if execution failed
+  error             String?
+  
+  /// Gas used for the transaction
+  gasUsed           String?
+  
+  /// Total cost (in native currency)
+  totalCost         String?
+  
+  /// Execution result metadata (JSON)
+  resultMetadata    String?
+  
+  /// Duration in milliseconds
+  durationMs        Int?
+  
+  triggeredAt       DateTime   @default(now())
+  executedAt        DateTime?
+  completedAt       DateTime?
+
+  @@index([automationId])
+  @@index([status])
+  @@index([transactionHash])
+  @@index([triggeredAt])
+}
+
+// ============================================================================
+// SECURITY & AUDIT MODELS
+// ============================================================================
+
+/// Contract security scan results cache
+model ContractScan {
+  id                String     @id @default(cuid())
+  
+  /// Contract address
+  contractAddress   String
+  
+  /// Chain ID (42220 for Celo mainnet, 44787 for Alfajores)
+  chainId           Int
+  
+  /// Overall risk level
+  riskLevel         String     // 'low' | 'medium' | 'high' | 'critical'
+  
+  /// Risk score (0-100)
+  riskScore         Int
+  
+  /// Is contract verified on block explorer
+  isVerified        Boolean    @default(false)
+  
+  /// Full scan result (JSON)
+  scanResult        String     // JSON string of ContractScanResult
+  
+  /// Cache validity (prevents re-scanning same contract)
+  expiresAt         DateTime
+  
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@unique([contractAddress, chainId])
+  @@index([riskLevel])
+  @@index([expiresAt])
+}
+
+/// Audit trail for compliance and debugging
+model AuditLog {
+  id                String     @id @default(cuid())
+  
+  automation        Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  automationId      String
+  
+  /// Action performed
+  action            String     // 'create' | 'update' | 'delete' | 'enable' | 'disable' | 'execute'
+  
+  /// User/actor who performed the action
+  actor             String
+  
+  /// Changes made (JSON diff)
+  changes           String?
+  
+  /// IP address (for security audit)
+  ipAddress         String?
+  
+  /// Additional context
+  metadata          String?
+  
+  createdAt         DateTime   @default(now())
+
+  @@index([automationId])
+  @@index([action])
+  @@index([actor])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// TRANSACTION MONITORING
+// ============================================================================
+
+/// Tracks pending transactions
+model PendingTransaction {
+  id                String     @id @default(cuid())
+  
+  /// Transaction hash
+  transactionHash   String     @unique
+  
+  /// Related automation (if any)
+  automationId      String?
+  
+  /// Current status
+  status            String     // 'pending' | 'confirmed' | 'failed'
+  
+  /// Block number when confirmed
+  blockNumber       Int?
+  
+  /// Number of retries
+  retryCount        Int        @default(0)
+  
+  /// Last retry timestamp
+  lastRetryAt       DateTime?
+  
+  submittedAt       DateTime   @default(now())
+  confirmedAt       DateTime?
+  
+  @@index([status])
+  @@index([submittedAt])
+}
+
+// ============================================================================
+// USER PREFERENCES & SETTINGS
+// ============================================================================
+
+/// User settings and preferences
+model UserPreferences {
+  id                String     @id @default(cuid())
+  
+  /// User/wallet address
+  userId            String     @unique
+  
+  /// Preferred chain ID
+  preferredChainId  Int        @default(42220)
+  
+  /// Notifications enabled
+  notificationsEnabled Boolean  @default(true)
+  
+  /// Email for notifications (optional)
+  notificationEmail String?
+  
+  /// Risk tolerance (0-100, where 100 is most aggressive)
+  riskTolerance     Int        @default(50)
+  
+  /// API key for programmatic access (hashed)
+  apiKeyHash        String?
+  
+  /// Theme preference
+  theme             String     @default("dark") // 'light' | 'dark'
+  
+  /// Settings metadata (JSON)
+  metadata          String?
+  
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+}
+
+// ============================================================================
+// ANALYTICS
+// ============================================================================
+
+/// Daily statistics for analytics
+model DailyStats {
+  id                String     @id @default(cuid())
+  
+  date              DateTime   @unique
+  
+  /// Total automations at end of day
+  totalAutomations  Int
+  
+  /// Automations created today
+  automationsCreated Int
+  
+  /// Automations deleted today
+  automationsDeleted Int
+  
+  /// Total executions today
+  totalExecutions   Int
+  
+  /// Successful executions today
+  successfulExecutions Int
+  
+  /// Failed executions today
+  failedExecutions  Int
+  
+  /// Total gas spent (in native currency)
+  totalGasSpent     String
+  
+  /// Average execution time (ms)
+  avgExecutionTime  Int
+  
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@index([date])
+}

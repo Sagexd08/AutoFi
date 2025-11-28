@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Address, formatUnits } from 'viem';
+import { formatUnits } from 'viem';
 import {
     SimulationConfig,
     SimulationConfigSchema,

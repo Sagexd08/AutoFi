@@ -91,13 +91,12 @@ router.post('/', async (req: Request, res: Response, next: NextFunction): Promis
       return;
     }
 
-    // Create a LangChain agent for this specialized agent
+    // Create a custom ML agent for this specialized agent
     const agent = new LangChainAgent({
       id,
-      type: 'langchain',
+      type: 'custom',
       name: parsed.name,
-      model: process.env.AI_MODEL || 'gemini-1.5-flash',
-      geminiApiKey: process.env.GEMINI_API_KEY,
+      model: process.env.AI_MODEL || 'custom-ml-v1',
       celoClient,
       metadata: {
         ...(parsed.metadata || {}),

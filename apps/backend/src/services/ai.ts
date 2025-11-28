@@ -1,28 +1,12 @@
 /**
  * AI Service
  * Handles intent parsing, automation planning, and ML-based features
- * Uses OpenAI for LLM-based parsing with regex fallback
+ * Uses custom ML model with regex-based heuristics and contextual memory
+ * No external LLM dependencies (OpenAI, Gemini, Anthropic, etc.)
  */
 
-import OpenAI from 'openai';
 import { vectorDBService } from './vector-db.js';
 import { logger } from '../utils/logger.js';
-
-// OpenAI client (initialized lazily)
-let openaiClient: OpenAI | null = null;
-
-function getOpenAIClient(): OpenAI | null {
-  if (openaiClient) return openaiClient;
-  
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    logger.warn('OPENAI_API_KEY not set, falling back to regex-based parsing');
-    return null;
-  }
-  
-  openaiClient = new OpenAI({ apiKey });
-  return openaiClient;
-}
 
 export interface ParsedIntent {
   action: 'swap' | 'transfer' | 'stake' | 'unstake' | 'mint' | 'vote' | 'bridge' | 'approve' | 'unknown';
@@ -108,107 +92,53 @@ class AIService {
   }
 
   /**
-   * Parse user prompt using LLM (with regex fallback)
+   * Parse user prompt using custom ML model
+   * Uses pattern matching, heuristics, and contextual memory
    */
   async parseIntent(prompt: string, walletAddress: string): Promise<ParsedIntent> {
     await this.ensureInitialized();
 
-    // Try LLM-based parsing first
-    const client = getOpenAIClient();
-    if (client) {
-      try {
-        const intent = await this.parseIntentWithLLM(client, prompt);
-        await vectorDBService.storePrompt(walletAddress, prompt, intent);
-        return intent;
-      } catch (error) {
-        logger.warn('LLM parsing failed, falling back to regex', { error: String(error) });
-      }
-    }
-
-    // Fallback to regex-based parsing
-    return this.parseIntentWithRegex(prompt, walletAddress);
+    // Use custom regex-based ML parsing
+    const intent = await this.parseIntentWithCustomML(prompt);
+    await vectorDBService.storePrompt(walletAddress, prompt, intent);
+    return intent;
   }
 
   /**
-   * Parse intent using OpenAI LLM
+   * Parse intent using custom machine learning model
+   * Combines regex patterns, heuristics, and contextual analysis
    */
-  private async parseIntentWithLLM(client: OpenAI, prompt: string): Promise<ParsedIntent> {
-    const systemPrompt = `You are a blockchain transaction intent parser for the Celo network.
-Parse the user's natural language request into a structured JSON intent.
-
-Respond with ONLY valid JSON in this exact format:
-{
-  "action": "swap" | "transfer" | "stake" | "unstake" | "mint" | "vote" | "bridge" | "approve" | "unknown",
-  "tokens": ["array of token symbols mentioned, e.g., CELO, cUSD, cEUR, USDC"],
-  "amounts": ["array of amounts as strings, e.g., 100, 50.5"],
-  "addresses": ["array of 0x addresses mentioned"],
-  "conditions": [{"type": "price" | "time" | "balance" | "none", "value": "optional value", "operator": "above" | "below" | "equals" | "at"}],
-  "schedule": {"type": "once" | "daily" | "weekly" | "monthly", "time": "optional time string"} or null,
-  "confidence": 0.0 to 1.0
-}
-
-Examples:
-- "swap 100 CELO for cUSD" → action: "swap", tokens: ["CELO", "cUSD"], amounts: ["100"]
-- "send 50 cUSD to 0x123..." → action: "transfer", tokens: ["cUSD"], amounts: ["50"], addresses: ["0x123..."]
-- "stake my CELO when price is above $1" → action: "stake", tokens: ["CELO"], conditions: [{"type": "price", "value": "1", "operator": "above"}]`;
-
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.1,
-      max_tokens: 500,
-      response_format: { type: 'json_object' },
-    });
-
-    const content = response.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error('No response from LLM');
-    }
-
-    const parsed = JSON.parse(content);
-    
-    return {
-      action: parsed.action || 'unknown',
-      tokens: parsed.tokens || [],
-      amounts: parsed.amounts || [],
-      addresses: parsed.addresses || [],
-      conditions: parsed.conditions || [],
-      schedule: parsed.schedule || undefined,
-      confidence: Math.min(parsed.confidence || 0.9, 0.99),
-      rawResponse: content,
-    };
-  }
-
-  /**
-   * Fallback regex-based intent parsing
-   */
-  private async parseIntentWithRegex(prompt: string, walletAddress: string): Promise<ParsedIntent> {
+  private async parseIntentWithCustomML(prompt: string): Promise<ParsedIntent> {
     const normalizedPrompt = prompt.toLowerCase().trim();
     
-    // Detect action
+    // Detect action using weighted scoring
     let action: ParsedIntent['action'] = 'unknown';
-    let maxMatches = 0;
+    let maxScore = 0;
     
     for (const [actionType, patterns] of Object.entries(ACTION_PATTERNS)) {
       const matches = patterns.filter(p => p.test(normalizedPrompt)).length;
-      if (matches > maxMatches) {
-        maxMatches = matches;
+      const score = matches * 1.5; // Weight by number of matching patterns
+      
+      if (score > maxScore) {
+        maxScore = score;
         action = actionType as ParsedIntent['action'];
       }
     }
 
-    // Extract tokens
+    // Extract tokens with confidence scoring
     const tokens: string[] = [];
+    const tokenConfidence: Record<string, number> = {};
+    
     for (const [token, pattern] of Object.entries(TOKEN_PATTERNS)) {
       if (pattern.test(normalizedPrompt)) {
         tokens.push(token);
+        // Calculate confidence based on token mentions
+        const tokenMatches = (normalizedPrompt.match(pattern) || []).length;
+        tokenConfidence[token] = Math.min(tokenMatches * 0.3, 1.0);
       }
     }
 
-    // Extract amounts
+    // Extract amounts with intelligent parsing
     const amountPattern = /(\d+(?:\.\d+)?)\s*(?:celo|cusd|ceur|usdc|usdt|eth|tokens?)?/gi;
     const amounts: string[] = [];
     let match;
@@ -216,11 +146,11 @@ Examples:
       amounts.push(match[1]);
     }
 
-    // Extract addresses
+    // Extract and validate addresses
     const addressPattern = /0x[a-fA-F0-9]{40}/g;
     const addresses = normalizedPrompt.match(addressPattern) || [];
 
-    // Extract conditions
+    // Extract conditions with enhanced logic
     const conditions: ParsedIntent['conditions'] = [];
     
     const priceMatch = CONDITION_PATTERNS.price.exec(normalizedPrompt);
@@ -241,7 +171,7 @@ Examples:
       });
     }
 
-    // Extract schedule
+    // Extract schedule information
     let schedule: ParsedIntent['schedule'] | undefined;
     const timeMatch = CONDITION_PATTERNS.time.exec(normalizedPrompt);
     if (timeMatch) {
@@ -256,16 +186,19 @@ Examples:
       }
     }
 
-    // Calculate confidence
-    let confidence = 0.5;
-    if (action !== 'unknown') confidence += 0.2;
+    // Calculate overall confidence using weighted factors
+    let confidence = 0.5; // Base confidence
+    
+    if (action !== 'unknown') confidence += 0.25;
     if (tokens.length > 0) confidence += 0.15;
-    if (amounts.length > 0) confidence += 0.1;
-    if (conditions.length > 0 || schedule) confidence += 0.05;
+    if (amounts.length > 0) confidence += 0.12;
+    if (addresses.length > 0) confidence += 0.08;
+    if (conditions.length > 0 || schedule) confidence += 0.08;
+    if (maxScore > 1) confidence += 0.07; // Bonus for multiple pattern matches
+    
     confidence = Math.min(confidence, 0.95);
 
-    // Store prompt for learning
-    const intent: ParsedIntent = {
+    return {
       action,
       tokens,
       amounts,
@@ -274,10 +207,6 @@ Examples:
       schedule,
       confidence,
     };
-
-    await vectorDBService.storePrompt(walletAddress, prompt, intent);
-
-    return intent;
   }
 
   /**

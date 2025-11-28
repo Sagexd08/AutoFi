@@ -6,11 +6,6 @@ import type {
   ProcessPromptOptions,
   AgentResponse,
 } from './types.js';
-import {
-  ChatPromptTemplate,
-  SystemMessagePromptTemplate,
-  HumanMessagePromptTemplate,
-} from '@langchain/core/prompts';
 
 export abstract class BaseAgent implements SpecializedAgent {
   protected config: SpecializedAgentConfig;
@@ -34,20 +29,9 @@ export abstract class BaseAgent implements SpecializedAgent {
     const fullPrompt = this.buildPrompt(prompt, options?.context);
     const llm = this.langchainAgent.getLLM();
 
-    const systemPrompt = SystemMessagePromptTemplate.fromTemplate(
-      this.getSystemPrompt()
-    );
-    const humanPrompt = HumanMessagePromptTemplate.fromTemplate('{input}');
+    // Use custom ML engine for decision making
+    const reasoning = await llm.decide(fullPrompt, options?.context);
 
-    const chatPrompt = ChatPromptTemplate.fromMessages([
-      systemPrompt,
-      humanPrompt,
-    ]);
-
-    const chain = chatPrompt.pipe(llm);
-    const response = await chain.invoke({ input: fullPrompt });
-
-    const reasoning = response.content as string;
     const plan = this.parsePlan(reasoning);
     const riskSummary = await this.assessRisk(
       options?.proposedTransactions || []

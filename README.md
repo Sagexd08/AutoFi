@@ -7,7 +7,7 @@
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)
 
-**Advanced AI-powered Celo blockchain automation monorepo with LangChain orchestration**
+**Advanced AI-powered Celo blockchain automation monorepo with custom ML orchestration**
 
 [Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Contributing](#-contributing)
 
@@ -22,10 +22,10 @@ Celo AI Automator is a comprehensive, production-ready platform for building AI-
 ## ✨ Features
 
 ### 🤖 AI-Powered Automation
-- **LangChain Integration**: Advanced AI orchestration with LangChain
+- **Custom ML Engine**: Advanced in-house machine learning with heuristic-based decision making
 - **Multi-Agent System**: Treasury Manager, Donation Splitter, Yield Optimizer, NFT Minter, Governance Participant
 - **Natural Language Processing**: Convert natural language instructions into blockchain transactions
-- **Intelligent Decision Making**: AI-powered risk assessment and transaction validation
+- **Intelligent Decision Making**: Custom ML-powered risk assessment and transaction validation
 
 ### 🌐 Multi-Chain Support
 - **Supported Chains**: Ethereum, Polygon, BSC, Arbitrum, Optimism, Celo, Base, Avalanche, and more
@@ -129,12 +129,12 @@ CELO_PRIVATE_KEY=your_private_key
 CELO_NETWORK=alfajores
 CELO_RPC_URL=https://alfajores-forno.celo-testnet.org
 
-# AI Configuration
-GEMINI_API_KEY=your_gemini_key
-
 # Server Configuration
 PORT=3000
 NODE_ENV=development
+
+# Database Configuration
+DATABASE_URL=file:./data/dev.db
 
 # Optional: Advanced Features
 ALCHEMY_API_KEY=your_alchemy_key

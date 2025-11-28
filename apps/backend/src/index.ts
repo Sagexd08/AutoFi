@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import { validateBackendEnvironment, getBackendEnv, getEnvironmentConfig } from './env.js';
 import { workflowRoutes } from './routes/workflows.js';
 import { agentRoutes } from './routes/agents.js';
 import { deployRoutes } from './routes/deploy.js';
@@ -28,36 +29,14 @@ import { webSocketService } from './services/websocket.js';
 
 dotenv.config();
 
-// Environment validation
-function validateEnvironment(): void {
-  const required = [
-    'CELO_PRIVATE_KEY',
-  ];
-  
-  const recommended = [
-    'VECTOR_DB_PATH',
-    'OPENAI_API_KEY',
-    'CELO_RPC_URL',
-  ];
-  
-  const missing = required.filter(key => !process.env[key]);
-  const missingRecommended = recommended.filter(key => !process.env[key]);
-  
-  if (missing.length > 0) {
-    console.warn(`⚠️  Missing required environment variables: ${missing.join(', ')}`);
-    console.warn('   Some features may not work correctly.');
-  }
-  
-  if (missingRecommended.length > 0) {
-    console.warn(`ℹ️  Missing recommended environment variables: ${missingRecommended.join(', ')}`);
-  }
-}
-
-validateEnvironment();
+// Validate environment variables on startup
+validateBackendEnvironment();
+const env = getBackendEnv();
+const envConfig = getEnvironmentConfig();
 
 const app = express();
 const server = createServer(app);
-const PORT = process.env.PORT || 3001;
+const PORT = env.PORT;
 
 app.use(helmet());
 app.use(cors());
@@ -118,7 +97,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
     timestamp,
   };
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (!envConfig.isProduction) {
     response.error = err.message || 'Internal server error';
 
     if (err.stack) {

@@ -1,4 +1,22 @@
-import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
+/**
+ * Custom Message types (no LangChain dependencies)
+ */
+export interface HumanMessage {
+  role: 'user';
+  content: string;
+}
+
+export interface AIMessage {
+  role: 'assistant';
+  content: string;
+}
+
+export interface SystemMessage {
+  role: 'system';
+  content: string;
+}
+
+export type Message = HumanMessage | AIMessage | SystemMessage;
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -75,14 +93,14 @@ export class BufferMemory {
       this.recentActions = this.recentActions.slice(-20);
     }
   }
-  getChatHistory(): Array<HumanMessage | AIMessage | SystemMessage> {
+  getChatHistory(): Message[] {
     return this.chatHistory.map((msg) => {
       if (msg.role === 'user') {
-        return new HumanMessage(msg.content);
+        return { role: 'user', content: msg.content } as HumanMessage;
       } else if (msg.role === 'system') {
-        return new SystemMessage(msg.content);
+        return { role: 'system', content: msg.content } as SystemMessage;
       } else {
-        return new AIMessage(msg.content);
+        return { role: 'assistant', content: msg.content } as AIMessage;
       }
     });
   }

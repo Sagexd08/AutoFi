@@ -1,15 +1,10 @@
 import {
-    createPublicClient,
-    createWalletClient,
-    http,
     Address,
     WalletClient,
     PublicClient,
     parseAbi,
 } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
-import { mainnet } from 'viem/chains';
-import { ApprovalRecord, RevocationResult, RevokeQueueItem } from './types';
+import { ApprovalRecord, ApprovalStatus, RevocationResult, RevokeQueueItem } from './types';
 import { AllowanceDatabase } from './database/allowance-db';
 
 /**
@@ -98,6 +93,7 @@ export class AutoRevokeSystem {
                 functionName: 'approve',
                 args: [approval.spenderAddress, BigInt(0)],
                 account: approval.walletAddress,
+                chain: walletClient.chain,
             });
 
             console.log(`Revoke transaction sent: ${hash}`);
@@ -107,7 +103,7 @@ export class AutoRevokeSystem {
 
             if (receipt.status === 'success') {
                 // Update database
-                this.db.updateApprovalStatus(approval.id, 'revoked', hash);
+                this.db.updateApprovalStatus(approval.id, ApprovalStatus.REVOKED, hash);
 
                 console.log(`✅ Approval ${approval.id} revoked successfully`);
 
@@ -146,7 +142,7 @@ export class AutoRevokeSystem {
             const itemsToProcess: RevokeQueueItem[] = [];
 
             // Find items ready for processing
-            for (const [id, item] of this.revokeQueue.entries()) {
+            for (const [_id, item] of this.revokeQueue.entries()) {
                 if (item.scheduledFor <= now) {
                     itemsToProcess.push(item);
                 }
@@ -173,7 +169,7 @@ export class AutoRevokeSystem {
                     continue;
                 }
 
-                if (approval.status !== 'active') {
+                if (approval.status !== ApprovalStatus.ACTIVE) {
                     console.log(`Approval ${item.approvalId} already ${approval.status}`);
                     this.revokeQueue.delete(item.approvalId);
                     continue;
@@ -184,7 +180,7 @@ export class AutoRevokeSystem {
                 // mark it as pending and let the user handle the actual revocation.
 
                 console.log(`Approval ${item.approvalId} ready for revocation`);
-                this.db.updateApprovalStatus(item.approvalId, 'pending_revoke');
+                this.db.updateApprovalStatus(item.approvalId, ApprovalStatus.PENDING_REVOKE);
                 this.revokeQueue.delete(item.approvalId);
             }
         } finally {

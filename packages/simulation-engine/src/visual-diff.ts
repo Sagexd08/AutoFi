@@ -1,4 +1,4 @@
-import { SimulationResult, AssetChange } from './types';
+import { SimulationResult } from './types';
 
 /**
  * Visual Diff - Generates before/after comparison data

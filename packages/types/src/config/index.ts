@@ -1,6 +1,6 @@
 export interface AutomatorConfig {
-  geminiApiKey?: string;
-  langchainApiKey?: string;
+  // Custom ML configuration (no external LLM dependencies)
+  mlEngineEnabled?: boolean;
   celoPrivateKey?: string;
   network: 'alfajores' | 'mainnet' | 'baklava';
   rpcUrl?: string;
