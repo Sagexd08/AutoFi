@@ -32,7 +32,7 @@ export class ContextualMemory {
     private config: ContextualMemoryConfig;
     private vectorStore: VectorStore;
     private preferenceLearner: PreferenceLearner;
-    private embeddingService: EmbeddingService;
+    private _embeddingService: EmbeddingService;
     private userContextCache: Map<string, { context: UserContext; timestamp: number }>;
     private feedbackStore: Map<string, UserFeedback[]>;
 
@@ -40,9 +40,16 @@ export class ContextualMemory {
         this.config = ContextualMemoryConfigSchema.parse(config || {});
         this.vectorStore = new VectorStore(this.config);
         this.preferenceLearner = new PreferenceLearner(this.config);
-        this.embeddingService = new EmbeddingService(this.config);
+        this._embeddingService = new EmbeddingService(this.config);
         this.userContextCache = new Map();
         this.feedbackStore = new Map();
+    }
+
+    /**
+     * Get the embedding service for external use
+     */
+    get embeddingService(): EmbeddingService {
+        return this._embeddingService;
     }
 
     /**

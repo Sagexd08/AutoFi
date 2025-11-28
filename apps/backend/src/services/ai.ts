@@ -1,10 +1,28 @@
 /**
  * AI Service
  * Handles intent parsing, automation planning, and ML-based features
+ * Uses OpenAI for LLM-based parsing with regex fallback
  */
 
+import OpenAI from 'openai';
 import { vectorDBService } from './vector-db.js';
 import { logger } from '../utils/logger.js';
+
+// OpenAI client (initialized lazily)
+let openaiClient: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI | null {
+  if (openaiClient) return openaiClient;
+  
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    logger.warn('OPENAI_API_KEY not set, falling back to regex-based parsing');
+    return null;
+  }
+  
+  openaiClient = new OpenAI({ apiKey });
+  return openaiClient;
+}
 
 export interface ParsedIntent {
   action: 'swap' | 'transfer' | 'stake' | 'unstake' | 'mint' | 'vote' | 'bridge' | 'approve' | 'unknown';
@@ -21,6 +39,7 @@ export interface ParsedIntent {
     time?: string;
   };
   confidence: number;
+  rawResponse?: string;
 }
 
 export interface ExecutionPlan {
@@ -89,11 +108,84 @@ class AIService {
   }
 
   /**
-   * Parse user prompt to extract intent
+   * Parse user prompt using LLM (with regex fallback)
    */
   async parseIntent(prompt: string, walletAddress: string): Promise<ParsedIntent> {
     await this.ensureInitialized();
 
+    // Try LLM-based parsing first
+    const client = getOpenAIClient();
+    if (client) {
+      try {
+        const intent = await this.parseIntentWithLLM(client, prompt);
+        await vectorDBService.storePrompt(walletAddress, prompt, intent);
+        return intent;
+      } catch (error) {
+        logger.warn('LLM parsing failed, falling back to regex', { error: String(error) });
+      }
+    }
+
+    // Fallback to regex-based parsing
+    return this.parseIntentWithRegex(prompt, walletAddress);
+  }
+
+  /**
+   * Parse intent using OpenAI LLM
+   */
+  private async parseIntentWithLLM(client: OpenAI, prompt: string): Promise<ParsedIntent> {
+    const systemPrompt = `You are a blockchain transaction intent parser for the Celo network.
+Parse the user's natural language request into a structured JSON intent.
+
+Respond with ONLY valid JSON in this exact format:
+{
+  "action": "swap" | "transfer" | "stake" | "unstake" | "mint" | "vote" | "bridge" | "approve" | "unknown",
+  "tokens": ["array of token symbols mentioned, e.g., CELO, cUSD, cEUR, USDC"],
+  "amounts": ["array of amounts as strings, e.g., 100, 50.5"],
+  "addresses": ["array of 0x addresses mentioned"],
+  "conditions": [{"type": "price" | "time" | "balance" | "none", "value": "optional value", "operator": "above" | "below" | "equals" | "at"}],
+  "schedule": {"type": "once" | "daily" | "weekly" | "monthly", "time": "optional time string"} or null,
+  "confidence": 0.0 to 1.0
+}
+
+Examples:
+- "swap 100 CELO for cUSD" → action: "swap", tokens: ["CELO", "cUSD"], amounts: ["100"]
+- "send 50 cUSD to 0x123..." → action: "transfer", tokens: ["cUSD"], amounts: ["50"], addresses: ["0x123..."]
+- "stake my CELO when price is above $1" → action: "stake", tokens: ["CELO"], conditions: [{"type": "price", "value": "1", "operator": "above"}]`;
+
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.1,
+      max_tokens: 500,
+      response_format: { type: 'json_object' },
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error('No response from LLM');
+    }
+
+    const parsed = JSON.parse(content);
+    
+    return {
+      action: parsed.action || 'unknown',
+      tokens: parsed.tokens || [],
+      amounts: parsed.amounts || [],
+      addresses: parsed.addresses || [],
+      conditions: parsed.conditions || [],
+      schedule: parsed.schedule || undefined,
+      confidence: Math.min(parsed.confidence || 0.9, 0.99),
+      rawResponse: content,
+    };
+  }
+
+  /**
+   * Fallback regex-based intent parsing
+   */
+  private async parseIntentWithRegex(prompt: string, walletAddress: string): Promise<ParsedIntent> {
     const normalizedPrompt = prompt.toLowerCase().trim();
     
     // Detect action

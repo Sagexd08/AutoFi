@@ -1,4 +1,5 @@
 import express from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -13,17 +14,50 @@ import { walletRoutes } from './routes/wallet.js';
 import { eventRoutes } from './routes/events.js';
 import { healthRoutes } from './routes/health.js';
 import { aiRoutes } from './routes/ai.js';
+import { automationsRoutes } from './routes/automations.js';
+import { analyticsRoutes } from './routes/analytics.js';
+import { statusRoutes } from './routes/status.js';
+import { blockchainRoutes } from './routes/blockchain.js';
 import { logger } from './utils/logger.js';
 import { sanitizeErrorForLogging, generateErrorCode } from './utils/error-sanitizer.js';
 import { setupMetricsRoute } from './middleware/metrics-route.js';
 import { auditMiddleware } from './middleware/audit.js';
 import { vectorDBService } from './services/vector-db.js';
 import { aiService } from './services/ai.js';
+import { webSocketService } from './services/websocket.js';
 
 dotenv.config();
 
+// Environment validation
+function validateEnvironment(): void {
+  const required = [
+    'CELO_PRIVATE_KEY',
+  ];
+  
+  const recommended = [
+    'VECTOR_DB_PATH',
+    'OPENAI_API_KEY',
+    'CELO_RPC_URL',
+  ];
+  
+  const missing = required.filter(key => !process.env[key]);
+  const missingRecommended = recommended.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    console.warn(`⚠️  Missing required environment variables: ${missing.join(', ')}`);
+    console.warn('   Some features may not work correctly.');
+  }
+  
+  if (missingRecommended.length > 0) {
+    console.warn(`ℹ️  Missing recommended environment variables: ${missingRecommended.join(', ')}`);
+  }
+}
+
+validateEnvironment();
+
 const app = express();
-const PORT = process.env.PORT || 3000;
+const server = createServer(app);
+const PORT = process.env.PORT || 3001;
 
 app.use(helmet());
 app.use(cors());
@@ -46,6 +80,11 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/automations', automationsRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/system', statusRoutes);
+app.use('/api/status', statusRoutes);
+app.use('/api/blockchain', blockchainRoutes);
 
 setupMetricsRoute(app);
 
@@ -108,11 +147,18 @@ async function startServer() {
     await aiService.initialize();
     logger.info('AI service initialized');
 
-    app.listen(PORT, () => {
+    // Initialize WebSocket server
+    webSocketService.initialize(server);
+    logger.info('WebSocket server initialized');
+
+    server.listen(PORT, () => {
       console.log(`🚀 Celo Automator Backend running on port ${PORT}`);
       const host = process.env.HOST || 'localhost';
       console.log(`📖 Health check: http://${host}:${PORT}/api/health`);
       console.log(`🧠 AI API: http://${host}:${PORT}/api/ai`);
+      console.log(`🤖 Automations: http://${host}:${PORT}/api/automations`);
+      console.log(`📈 Analytics: http://${host}:${PORT}/api/analytics`);
+      console.log(`🔗 WebSocket: ws://${host}:${PORT}/ws`);
       console.log(`📊 Vector DB ready with semantic search`);
     });
   } catch (error) {

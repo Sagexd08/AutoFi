@@ -4,6 +4,8 @@
  */
 
 import Database from 'better-sqlite3';
+import * as fs from 'fs';
+import * as path from 'path';
 import type { VectorDocument } from '../embeddings/hnsw-index.js';
 
 export interface PersistenceConfig {
@@ -38,6 +40,13 @@ export class SQLitePersistence {
 
   constructor(config: PersistenceConfig) {
     this.tableName = config.tableName || 'vector_documents';
+    
+    // Ensure directory exists
+    const dir = path.dirname(config.dbPath);
+    if (dir && dir !== '.' && dir !== ':memory:' && !fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
     this.db = new Database(config.dbPath);
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('synchronous = NORMAL');

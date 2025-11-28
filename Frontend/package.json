@@ -68,8 +68,8 @@
     "tailwindcss-animate": "^1.0.7",
     "use-sync-external-store": "latest",
     "vaul": "^1.1.2",
-    "viem": "^2.38.4",
-    "wagmi": "^2.18.2",
+    "viem": "^2.40.3",
+    "wagmi": "^3.0.2",
     "ws": "^8.18.3",
     "zod": "^3.23.8",
     "zustand": "latest"

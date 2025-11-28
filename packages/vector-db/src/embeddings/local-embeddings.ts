@@ -1,7 +1,7 @@
 /**
- * Custom Local Embeddings Generator
- * Uses a lightweight approach without external LLM APIs
- * Implements TF-IDF + Word2Vec-style embeddings with optional LSTM enhancement
+ * Local Embeddings Generator
+ * Uses @xenova/transformers for real semantic embeddings
+ * Falls back to TF-IDF based embeddings if transformers unavailable
  */
 
 import { createHash } from 'crypto';
@@ -9,6 +9,7 @@ import { createHash } from 'crypto';
 export interface EmbeddingOptions {
   dimensions?: number;
   normalize?: boolean;
+  useTransformers?: boolean;
 }
 
 export interface EmbeddingResult {
@@ -17,7 +18,37 @@ export interface EmbeddingResult {
   dimensions: number;
 }
 
-// Vocabulary for semantic understanding of DeFi/blockchain terms
+// Dynamic import for transformers.js (optional dependency)
+let transformersPipeline: any = null;
+let embeddingModel: any = null;
+let transformersAvailable = false;
+
+async function initializeTransformers(): Promise<boolean> {
+  if (transformersPipeline !== null) {
+    return transformersAvailable;
+  }
+
+  try {
+    // @ts-ignore - dynamic import
+    const { pipeline } = await import('@xenova/transformers');
+    transformersPipeline = pipeline;
+    
+    // Initialize the embedding model
+    embeddingModel = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
+      quantized: true, // Use quantized model for faster inference
+    });
+    
+    transformersAvailable = true;
+    console.log('✅ Transformers.js initialized with all-MiniLM-L6-v2 model');
+    return true;
+  } catch (error) {
+    console.warn('⚠️ Transformers.js not available, falling back to TF-IDF embeddings:', error);
+    transformersAvailable = false;
+    return false;
+  }
+}
+
+// Vocabulary for semantic understanding of DeFi/blockchain terms (fallback)
 const DEFI_VOCABULARY: Record<string, number[]> = {
   // Actions
   'swap': [0.9, 0.1, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0],
@@ -68,12 +99,28 @@ const DEFI_VOCABULARY: Record<string, number[]> = {
 export class LocalEmbeddings {
   private dimensions: number;
   private normalize: boolean;
+  private useTransformers: boolean;
   private hashSeed: number;
+  private initialized: boolean = false;
 
   constructor(options: EmbeddingOptions = {}) {
-    this.dimensions = options.dimensions || 256;
+    this.dimensions = options.dimensions || 384; // MiniLM uses 384 dimensions
     this.normalize = options.normalize ?? true;
+    this.useTransformers = options.useTransformers ?? true;
     this.hashSeed = 42;
+  }
+
+  /**
+   * Initialize the embeddings model
+   */
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+    
+    if (this.useTransformers) {
+      await initializeTransformers();
+    }
+    
+    this.initialized = true;
   }
 
   /**
@@ -88,7 +135,25 @@ export class LocalEmbeddings {
   }
 
   /**
-   * Generate a deterministic hash-based embedding component
+   * Generate embedding using transformers.js
+   */
+  private async embedWithTransformers(text: string): Promise<number[]> {
+    if (!embeddingModel) {
+      await initializeTransformers();
+    }
+
+    if (!embeddingModel) {
+      throw new Error('Transformers model not available');
+    }
+
+    const output = await embeddingModel(text, { pooling: 'mean', normalize: true });
+    const embedding = Array.from(output.data as Float32Array);
+    
+    return embedding;
+  }
+
+  /**
+   * Generate a deterministic hash-based embedding component (fallback)
    */
   private hashToVector(token: string, dimensions: number): number[] {
     const hash = createHash('sha256').update(token + this.hashSeed).digest('hex');
@@ -104,7 +169,7 @@ export class LocalEmbeddings {
   }
 
   /**
-   * Get semantic vector for known DeFi terms
+   * Get semantic vector for known DeFi terms (fallback)
    */
   private getSemanticVector(token: string): number[] | null {
     const semantic = DEFI_VOCABULARY[token];
@@ -122,7 +187,7 @@ export class LocalEmbeddings {
   }
 
   /**
-   * Combine vectors with weights
+   * Combine vectors with weights (fallback)
    */
   private combineVectors(vectors: number[][], weights: number[]): number[] {
     const result = new Array(this.dimensions).fill(0);
@@ -155,9 +220,9 @@ export class LocalEmbeddings {
   }
 
   /**
-   * Generate embedding for text
+   * Fallback embedding using TF-IDF style approach
    */
-  async embed(text: string): Promise<EmbeddingResult> {
+  private async embedFallback(text: string): Promise<EmbeddingResult> {
     const tokens = this.tokenize(text);
     const vectors: number[][] = [];
     const weights: number[] = [];
@@ -203,6 +268,32 @@ export class LocalEmbeddings {
   }
 
   /**
+   * Generate embedding for text
+   */
+  async embed(text: string): Promise<EmbeddingResult> {
+    await this.initialize();
+    
+    const tokens = this.tokenize(text);
+    
+    // Try transformers first if available
+    if (this.useTransformers && transformersAvailable) {
+      try {
+        const embedding = await this.embedWithTransformers(text);
+        return {
+          embedding,
+          tokens,
+          dimensions: embedding.length,
+        };
+      } catch (error) {
+        console.warn('Transformers embedding failed, falling back:', error);
+      }
+    }
+    
+    // Fall back to TF-IDF style embeddings
+    return this.embedFallback(text);
+  }
+
+  /**
    * Generate embeddings for multiple texts
    */
   async embedBatch(texts: string[]): Promise<EmbeddingResult[]> {
@@ -214,7 +305,10 @@ export class LocalEmbeddings {
    */
   static cosineSimilarity(a: number[], b: number[]): number {
     if (a.length !== b.length) {
-      throw new Error('Vectors must have the same dimensions');
+      // Handle dimension mismatch by truncating or padding
+      const minLen = Math.min(a.length, b.length);
+      a = a.slice(0, minLen);
+      b = b.slice(0, minLen);
     }
     
     let dotProduct = 0;
@@ -233,6 +327,13 @@ export class LocalEmbeddings {
     if (magnitudeA === 0 || magnitudeB === 0) return 0;
     
     return dotProduct / (magnitudeA * magnitudeB);
+  }
+
+  /**
+   * Check if transformers.js is available
+   */
+  static isTransformersAvailable(): boolean {
+    return transformersAvailable;
   }
 }
 

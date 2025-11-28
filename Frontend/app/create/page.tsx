@@ -30,10 +30,9 @@ export default function CreateAutomation() {
     setPlan(null)
     
     try {
-      const response = await axios.post("http://localhost:3001/api/ai/plan", {
+      const response = await axios.post("http://localhost:3000/api/ai/plan", {
         prompt,
-        chainId: chainId || 42220,
-        balances: {} // Should fetch balances
+        walletAddress: address || "0x0000000000000000000000000000000000000000",
       })
       
       if (response.data.success) {
@@ -53,7 +52,7 @@ export default function CreateAutomation() {
     setLoading(true)
     
     try {
-      const response = await axios.post("http://localhost:3001/api/ai/execute", {
+      const response = await axios.post("http://localhost:3000/api/ai/execute", {
         plan,
         chainId: chainId || 42220
       })
