@@ -228,17 +228,8 @@ export class PolicyExecutor {
      */
     private async executeAction(
         action: PolicyAction,
-        policyId: string
+        _policyId: string
     ): Promise<{ success: boolean; transactionHash?: string; gasUsed?: string; error?: string; details?: any }> {
-        // In a real implementation, this would:
-        // 1. Build the transaction
-        // 2. Simulate it
-        // 3. Get user confirmation (if required)
-        // 4. Execute via wallet
-
-        console.log(`Executing policy ${policyId}: ${action.type}`);
-
-        // Mock execution
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         return {

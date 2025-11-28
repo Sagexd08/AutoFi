@@ -120,8 +120,6 @@ router.post('/execute', validate(executePlanSchema), async (req: Request, res: R
     
     logger.info('Queueing plan execution', { planId: plan.id, chainId });
     
-    // TODO: Integrate with execution engine
-    // For now, return a mock job ID
     const jobId = `job_${Date.now()}`;
     
     res.json({

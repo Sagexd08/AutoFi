@@ -7,14 +7,25 @@
   "packageManager": "pnpm@10.11.0",
   "scripts": {
     "dev": "turbo run dev",
+    "dev:backend": "cd apps/backend && pnpm dev",
+    "dev:frontend": "cd Frontend && pnpm dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "test:watch": "turbo run test:watch",
+    "test:coverage": "turbo run test:coverage",
     "type-check": "turbo run type-check",
     "clean": "turbo run clean && rimraf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "prepare": "turbo run type-check",
-    "deploy": "turbo run deploy"
+    "deploy": "turbo run deploy",
+    "quickstart": "bash scripts/quickstart.sh",
+    "quickstart:win": "cmd /c scripts/quickstart.bat",
+    "db:generate": "cd apps/backend && pnpm db:generate",
+    "db:migrate": "cd apps/backend && pnpm db:migrate",
+    "db:init": "cd apps/backend && pnpm db:init",
+    "db:studio": "cd apps/backend && pnpm db:studio",
+    "health": "curl http://localhost:3001/api/health"
   },
   "keywords": [
     "celo",

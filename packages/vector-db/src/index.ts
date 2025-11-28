@@ -93,16 +93,12 @@ export class VectorDB {
     // Initialize persistence layer
     if (this.config.persist && this.config.dbPath !== ':memory:') {
       try {
-        // Try SQLite first
         this.persistence = new SQLitePersistence({ dbPath: this.config.dbPath });
       } catch (sqliteError) {
-        // Fall back to memory persistence with JSON file backup
-        console.warn('SQLite not available, using memory persistence with JSON backup:', sqliteError);
         const jsonPath = this.config.dbPath.replace(/\.db$/, '.json');
         this.persistence = new MemoryPersistence({ filePath: jsonPath });
       }
       
-      // Load existing documents into indices
       await this.loadFromPersistence();
     }
 

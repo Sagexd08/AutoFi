@@ -148,8 +148,6 @@ export function useWallet() {
     })
 
     const unsubscribeChain = watchChainChanges((chainId) => {
-      console.log("[useWallet] Chain changed:", chainId)
-      // Refresh balance and tokens when chain changes
       refreshBalanceAndTokens()
     })
 

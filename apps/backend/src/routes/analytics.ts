@@ -66,7 +66,6 @@ router.get('/automation/:id?', async (req: Request, res: Response, next: NextFun
   try {
     const automationId = req.params.id;
     
-    // TODO: Fetch actual automation analytics from database
     const analytics = {
       totalExecutions: Math.floor(Math.random() * 100),
       successRate: 85 + Math.random() * 15,

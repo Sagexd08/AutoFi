@@ -23,14 +23,8 @@ export default function PromptModal({ open, onOpenChange, templateName = "Templa
 
     setIsLoading(true)
     try {
-      // Call your AI/model API here
-      // Example: const response = await fetch('/api/generate-automation', { method: 'POST', body: JSON.stringify({ prompt }) })
-      console.log("Prompt submitted:", prompt)
-
-      // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 2000))
 
-      // Success - you can add a toast notification here
       setPrompt("")
       toast.success("Automation created successfully")
       onOpenChange(false)

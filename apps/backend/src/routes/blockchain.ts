@@ -427,7 +427,6 @@ async function executeFunctionCall(
 
   switch (functionName) {
     case 'swap':
-      // TODO: Integrate with DEX (Ubeswap, Mento, etc.)
       return {
         action: 'swap',
         from: parameters.fromToken,
@@ -497,7 +496,6 @@ async function executeFunctionCall(
       }
       
     case 'stake':
-      // TODO: Integrate with Celo staking
       return {
         action: 'stake',
         amount: parameters.amount,

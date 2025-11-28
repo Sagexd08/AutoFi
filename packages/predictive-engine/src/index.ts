@@ -329,7 +329,6 @@ export class PredictiveEngine {
         if (this.config.modelPath) {
             await this.intentModel.saveModel(this.config.modelPath);
         }
-        // In production, would also save patterns to a database
     }
 
     /**

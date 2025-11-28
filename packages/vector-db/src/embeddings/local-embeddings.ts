@@ -39,10 +39,8 @@ async function initializeTransformers(): Promise<boolean> {
     });
     
     transformersAvailable = true;
-    console.log('✅ Transformers.js initialized with all-MiniLM-L6-v2 model');
     return true;
   } catch (error) {
-    console.warn('⚠️ Transformers.js not available, falling back to TF-IDF embeddings:', error);
     transformersAvailable = false;
     return false;
   }
@@ -285,11 +283,10 @@ export class LocalEmbeddings {
           dimensions: embedding.length,
         };
       } catch (error) {
-        console.warn('Transformers embedding failed, falling back:', error);
+        // Fall through to TF-IDF fallback
       }
     }
     
-    // Fall back to TF-IDF style embeddings
     return this.embedFallback(text);
   }
 

@@ -10,8 +10,6 @@ export default function DashboardCards() {
   const router = useRouter()
 
   const handleViewDetails = (id: string) => {
-    console.log("[v0] View details for automation:", id)
-    // Navigate to automation details page
     router.push(`/dashboard/automation/${id}`)
   }
 

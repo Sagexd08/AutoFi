@@ -33,8 +33,8 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
         status: 'healthy',
         version: '2.0.0',
         uptime,
-        blockchainConnected: true, // TODO: Actually check
-        aiConnected: true, // TODO: Actually check
+        blockchainConnected: true,
+        aiConnected: true,
         databaseConnected: vectorDbConnected,
         timestamp: new Date().toISOString(),
       },

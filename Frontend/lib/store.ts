@@ -417,8 +417,7 @@ export const useStore = create<Store>()(
       executeWithAI: async (prompt: string, context?: Record<string, any>) => {
         set({ loading: true })
         try {
-          const result = await blockchainIntegration.executeWithAI(prompt, context)
-          console.log('AI Execution Result:', result)
+          await blockchainIntegration.executeWithAI(prompt, context)
           set({ loading: false })
         } catch (error) {
           set({
@@ -432,9 +431,7 @@ export const useStore = create<Store>()(
         set({ loading: true })
         try {
           const result = await blockchainIntegration.createAutomationWithAI(prompt, context)
-          console.log('AI Automation Created:', result)
           
-          // Add to local automations list
           const newAutomation: Automation = {
             id: result.id,
             name: result.name,

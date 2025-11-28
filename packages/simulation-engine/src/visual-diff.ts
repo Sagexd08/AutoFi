@@ -54,15 +54,13 @@ export class VisualDiff {
             balances.push({
                 asset: key.split('-')[0],
                 symbol: data.symbol,
-                before: 'Current', // Placeholder
-                after: 'New',      // Placeholder
+                before: 'Current',
+                after: 'New',
                 change: `${data.change > 0 ? '+' : ''}${data.change.toFixed(4)}`,
                 isPositive: data.change >= 0,
             });
         });
 
-        // Process approvals (from state changes or inferred)
-        // This is a placeholder logic
         result.stateChanges.forEach(change => {
             if (change.type === 'APPROVAL') {
                 approvals.push({

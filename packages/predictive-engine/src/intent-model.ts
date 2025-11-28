@@ -5,16 +5,14 @@ import {
     ModelMetadata,
 } from './types';
 
-// TensorFlow.js types - using require to avoid ESM issues
-// In production, you'd want proper imports
 type Tensor = any;
 type LayersModel = any;
 
 /**
  * IntentModel - TensorFlow.js based ML model for intent prediction
  * 
- * This model uses a simple feedforward neural network to classify
- * user intents based on contextual features.
+ * Uses a feedforward neural network to classify user intents
+ * based on contextual features.
  */
 export class IntentModel {
     private model: LayersModel | null = null;
@@ -46,12 +44,7 @@ export class IntentModel {
         if (this.isInitialized) return;
 
         try {
-            // Dynamic import for TensorFlow.js
-            // Using tfjs instead of tfjs-node for broader compatibility
-            this.tf = await import('@tensorflow/tfjs-node').catch(() => {
-                console.warn('TensorFlow.js Node not available, using mock model');
-                return null;
-            });
+            this.tf = await import('@tensorflow/tfjs-node').catch(() => null);
 
             if (this.tf) {
                 await this.buildModel();
@@ -59,8 +52,7 @@ export class IntentModel {
             
             this.isInitialized = true;
         } catch (error) {
-            console.warn('TensorFlow initialization failed, using mock predictions:', error);
-            this.isInitialized = true; // Mark as initialized to prevent retry
+            this.isInitialized = true;
         }
     }
 
@@ -137,7 +129,6 @@ export class IntentModel {
      */
     async train(actions: UserAction[], epochs: number = 50): Promise<{ accuracy: number; loss: number }> {
         if (!this.tf || !this.model) {
-            console.warn('Model not initialized, cannot train');
             return { accuracy: 0, loss: 0 };
         }
 

@@ -84,13 +84,13 @@ class BlockchainIntegration {
     const response = await apiClient.getTransactionStatus(txHash)
     if (response.success && response.data) {
       return {
-        hash: txHash,
-        from: '',
-        to: '',
+        hash: txHash as `0x${string}`,
+        from: '' as `0x${string}`,
+        to: '' as `0x${string}`,
         value: '0',
         status: response.data.status as 'pending' | 'success' | 'failed',
         timestamp: Date.now(),
-        blockNumber: response.data.blockNumber
+        blockNumber: response.data.blockNumber !== undefined ? BigInt(response.data.blockNumber) : undefined
       }
     }
     throw new Error(response.error || 'Failed to get transaction status')
@@ -112,7 +112,7 @@ class BlockchainIntegration {
         id: Date.now().toString(),
         automationId,
         status: 'success',
-        txHash: response.data.txHash,
+        txHash: response.data.txHash as `0x${string}` | undefined,
         timestamp: Date.now(),
         result: response.data.result
       }
@@ -430,8 +430,6 @@ class BlockchainIntegration {
       }
       throw new Error(data.error || 'Failed to estimate gas')
     } catch (error) {
-      console.error('Gas estimation error:', error)
-      // Fallback to function call
       const response = await this.apiClient.callBlockchainFunction({
         functionName: 'estimateGas',
         parameters: transaction
