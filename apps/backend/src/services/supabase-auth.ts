@@ -1,15 +1,7 @@
-/**
- * Supabase Authentication Service
- * Handles user authentication and JWT token management
- */
-
 import { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient, createSupabaseAdmin } from '../config/supabase.js';
 import { logger } from '../utils/logger.js';
 
-/**
- * User session information
- */
 export interface UserSession {
   id: string;
   email: string;
@@ -20,9 +12,6 @@ export interface UserSession {
   expiresIn: number;
 }
 
-/**
- * Supabase Auth Service
- */
 export class SupabaseAuthService {
   private client: SupabaseClient;
   private admin: SupabaseClient;
@@ -32,9 +21,6 @@ export class SupabaseAuthService {
     this.admin = createSupabaseAdmin();
   }
 
-  /**
-   * Sign up user with email and password
-   */
   async signUp(email: string, password: string): Promise<UserSession> {
     try {
       const { data, error } = await this.client.auth.signUp({
@@ -68,9 +54,6 @@ export class SupabaseAuthService {
     }
   }
 
-  /**
-   * Sign in user with email and password
-   */
   async signIn(email: string, password: string): Promise<UserSession> {
     try {
       const { data, error } = await this.client.auth.signInWithPassword({
@@ -104,22 +87,17 @@ export class SupabaseAuthService {
     }
   }
 
-  /**
-   * Verify wallet signature (Web3 authentication)
-   */
   async verifyWalletSignature(
     walletAddress: string,
-    signature: string,
-    message: string
+    _signature: string,
+    _message: string
   ): Promise<UserSession> {
     try {
       logger.info('Wallet signature verification', { walletAddress });
 
-      // Get or create user with wallet
       const user = await this.getOrCreateWalletUser(walletAddress);
 
-      // Update user metadata with wallet
-      const { data, error } = await this.admin.auth.admin.updateUserById(user.id, {
+      const { error } = await this.admin.auth.admin.updateUserById(user.id, {
         user_metadata: {
           walletAddress,
           verifiedAt: new Date().toISOString(),
@@ -130,19 +108,7 @@ export class SupabaseAuthService {
         logger.error('Failed to update wallet user', { error });
         throw error;
       }
-
-      // Create session token
-      const { data: sessionData, error: sessionError } =
-        await this.admin.auth.admin.generateLink({
-          type: 'magiclink',
-          email: user.email || walletAddress,
-        });
-
-      if (sessionError) {
-        logger.error('Failed to generate session', { error: sessionError });
-        throw sessionError;
-      }
-
+      
       logger.info('Wallet user authenticated', { userId: user.id, walletAddress });
 
       return {
@@ -150,9 +116,9 @@ export class SupabaseAuthService {
         email: user.email || walletAddress,
         walletAddress,
         isVerified: true,
-        accessToken: sessionData?.session?.access_token || '',
-        refreshToken: sessionData?.session?.refresh_token,
-        expiresIn: sessionData?.session?.expires_in || 3600,
+        accessToken: '', 
+        refreshToken: undefined,
+        expiresIn: 3600,
       };
     } catch (error) {
       logger.error('Wallet signature verification error', { error });
@@ -160,12 +126,8 @@ export class SupabaseAuthService {
     }
   }
 
-  /**
-   * Get or create user by wallet address
-   */
   private async getOrCreateWalletUser(walletAddress: string) {
     try {
-      // Try to find existing user
       const { data: users, error: searchError } = await this.admin.auth.admin.listUsers();
 
       if (searchError) {
@@ -180,10 +142,9 @@ export class SupabaseAuthService {
         return existingUser;
       }
 
-      // Create new user for wallet
       const email = `${walletAddress.toLowerCase()}@wallet.autofi.local`;
       const password = Math.random().toString(36).substring(2, 15) +
-        Math.random().toString(36).substring(2, 15); // Random password
+        Math.random().toString(36).substring(2, 15);
 
       const { data, error } = await this.admin.auth.admin.createUser({
         email,
@@ -211,9 +172,6 @@ export class SupabaseAuthService {
     }
   }
 
-  /**
-   * Refresh access token
-   */
   async refreshToken(refreshToken: string): Promise<UserSession> {
     try {
       const { data, error } = await this.client.auth.refreshSession({
@@ -246,9 +204,6 @@ export class SupabaseAuthService {
     }
   }
 
-  /**
-   * Sign out user
-   */
   async signOut(): Promise<void> {
     try {
       const { error } = await this.client.auth.signOut();
@@ -265,9 +220,6 @@ export class SupabaseAuthService {
     }
   }
 
-  /**
-   * Get current user
-   */
   async getCurrentUser() {
     try {
       const {
@@ -287,9 +239,6 @@ export class SupabaseAuthService {
     }
   }
 
-  /**
-   * Verify email (confirm email)
-   */
   async confirmEmail(token: string): Promise<void> {
     try {
       const { error } = await this.client.auth.verifyOtp({
@@ -309,9 +258,6 @@ export class SupabaseAuthService {
     }
   }
 
-  /**
-   * Send password reset email
-   */
   async sendPasswordReset(email: string): Promise<void> {
     try {
       const { error } = await this.client.auth.resetPasswordForEmail(email, {
@@ -330,9 +276,6 @@ export class SupabaseAuthService {
     }
   }
 
-  /**
-   * Update user password
-   */
   async updatePassword(userId: string, newPassword: string): Promise<void> {
     try {
       const { error } = await this.admin.auth.admin.updateUserById(userId, {
@@ -352,14 +295,8 @@ export class SupabaseAuthService {
   }
 }
 
-/**
- * Auth service singleton
- */
 let authService: SupabaseAuthService | null = null;
 
-/**
- * Get auth service instance
- */
 export function getAuthService(): SupabaseAuthService {
   if (!authService) {
     authService = new SupabaseAuthService();

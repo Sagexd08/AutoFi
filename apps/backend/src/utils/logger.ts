@@ -19,7 +19,6 @@ const pinoLogger = pino({
   },
 });
 
-// Wrapper to handle both (message, obj) and (obj, message) formats
 export const logger = {
   info: (message: string, obj?: Record<string, unknown>) => {
     if (obj) {

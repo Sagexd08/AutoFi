@@ -1,11 +1,6 @@
-/**
- * Automation Execution Engine
- * Handles execution of automations with risk assessment and blockchain integration
- */
-
 import { v4 as uuidv4 } from 'uuid';
 import { CeloClient, sendCELO, sendToken } from '@celo-automator/celo-functions';
-import { RiskEngine } from '@celo-ai/risk-engine';
+import { RiskEngine, RiskRuleResult, RiskEvaluationInput } from '@celo-ai/risk-engine';
 import { logger } from '../utils/logger.js';
 import { getBackendEnv } from '../env.js';
 import type { Address } from 'viem';
@@ -46,26 +41,31 @@ class ExecutionEngine {
       blockThreshold: 0.85,
     });
 
-    // Initialize risk rules
     this.initializeRiskRules();
   }
 
-  /**
-   * Initialize risk assessment rules
-   */
   private initializeRiskRules() {
-    // Example risk rules - can be extended
     this.riskEngine.registerRule({
       id: 'value_threshold',
       label: 'High Value Transfer',
+      description: 'Checks if transaction value exceeds threshold',
       weight: 0.3,
-      evaluate: async (input: any) => {
-        const value = parseFloat(input.value || '0');
+      evaluate: async (input: RiskEvaluationInput): Promise<RiskRuleResult> => {
+        const value = parseFloat(input.transaction.value || '0');
         const threshold = 1000; // 1000 CELO threshold
+        const passed = value < threshold;
         return {
-          passed: value < threshold,
-          score: Math.min(value / threshold, 1),
-          details: { value, threshold },
+          id: 'value_threshold',
+          label: 'High Value Transfer',
+          weight: 0.3,
+          normalizedScore: passed ? 0 : Math.min(value / threshold, 1),
+          level: passed ? 'low' : 'high',
+          triggered: !passed,
+          requiresApproval: !passed,
+          blockExecution: false,
+          reasons: passed ? [] : [`Value ${value} exceeds threshold ${threshold}`],
+          recommendations: [],
+          metadata: { value, threshold },
         };
       },
     });
@@ -73,12 +73,21 @@ class ExecutionEngine {
     this.riskEngine.registerRule({
       id: 'contract_verification',
       label: 'Contract Verification',
+      description: 'Verifies contract status',
       weight: 0.4,
-      evaluate: async (input: any) => {
+      evaluate: async (_input: RiskEvaluationInput): Promise<RiskRuleResult> => {
         return {
-          passed: true,
-          score: 0,
-          details: { verified: true },
+          id: 'contract_verification',
+          label: 'Contract Verification',
+          weight: 0.4,
+          normalizedScore: 0,
+          level: 'low',
+          triggered: false,
+          requiresApproval: false,
+          blockExecution: false,
+          reasons: [],
+          recommendations: [],
+          metadata: { verified: true },
         };
       },
     });
@@ -86,23 +95,29 @@ class ExecutionEngine {
     this.riskEngine.registerRule({
       id: 'execution_frequency',
       label: 'Execution Frequency',
+      description: 'Checks execution frequency',
       weight: 0.3,
-      evaluate: async (input: any) => {
-        // Check if too many executions in short time
+      evaluate: async (_input: RiskEvaluationInput): Promise<RiskRuleResult> => {
         const executionCount = this.executions.size;
         const threshold = 100;
+        const passed = executionCount < threshold;
         return {
-          passed: executionCount < threshold,
-          score: Math.min(executionCount / threshold, 1),
-          details: { count: executionCount, threshold },
+          id: 'execution_frequency',
+          label: 'Execution Frequency',
+          weight: 0.3,
+          normalizedScore: passed ? 0 : Math.min(executionCount / threshold, 1),
+          level: passed ? 'low' : 'medium',
+          triggered: !passed,
+          requiresApproval: false,
+          blockExecution: false,
+          reasons: passed ? [] : [`Execution count ${executionCount} exceeds threshold ${threshold}`],
+          recommendations: [],
+          metadata: { count: executionCount, threshold },
         };
       },
     });
   }
 
-  /**
-   * Initialize Celo client
-   */
   private ensureCeloClient() {
     if (!this.celoClient) {
       const env = getBackendEnv();
@@ -118,9 +133,6 @@ class ExecutionEngine {
     }
   }
 
-  /**
-   * Execute an automation
-   */
   async execute(input: ExecutionInput): Promise<ExecutionResult> {
     const executionId = uuidv4();
     const startTime = Date.now();
@@ -132,14 +144,14 @@ class ExecutionEngine {
     };
 
     try {
-      // 1. Perform risk assessment
       logger.info('Starting risk assessment', { executionId, automationId: input.automationId });
 
       const riskAssessment = await this.riskEngine.scoreTransaction({
-        value: input.parameters?.value || '0',
-        to: input.parameters?.to,
-        data: input.parameters?.data,
-        automationId: input.automationId,
+        transaction: {
+          value: input.parameters?.value || '0',
+          to: input.parameters?.to,
+          data: input.parameters?.data,
+        },
       });
 
       result.riskAssessment = {
@@ -149,7 +161,6 @@ class ExecutionEngine {
         blockExecution: riskAssessment.blockExecution,
       };
 
-      // 2. Check if execution is blocked
       if (riskAssessment.blockExecution) {
         result.status = 'blocked';
         result.error = `Execution blocked due to high risk: ${riskAssessment.classification}`;
@@ -158,7 +169,6 @@ class ExecutionEngine {
         return result;
       }
 
-      // 3. Check if approval is required
       if (riskAssessment.requiresApproval) {
         result.status = 'pending';
         result.error = 'Approval required before execution';
@@ -167,7 +177,6 @@ class ExecutionEngine {
         return result;
       }
 
-      // 4. Execute the automation
       result.status = 'running';
       this.executions.set(executionId, result);
 
@@ -177,7 +186,6 @@ class ExecutionEngine {
         workflowConfig: input.workflowConfig,
       });
 
-      // Execute based on workflow type
       const executionResult = await this.executeWorkflow(
         input.workflowConfig,
         input.parameters || {}
@@ -209,9 +217,6 @@ class ExecutionEngine {
     return result;
   }
 
-  /**
-   * Execute workflow based on configuration
-   */
   private async executeWorkflow(
     config: any,
     parameters: Record<string, any>
@@ -243,9 +248,6 @@ class ExecutionEngine {
     }
   }
 
-  /**
-   * Execute transfer workflow
-   */
   private async executeTransfer(
     config: any,
     parameters: Record<string, any>
@@ -278,9 +280,6 @@ class ExecutionEngine {
     };
   }
 
-  /**
-   * Execute swap workflow (placeholder)
-   */
   private async executeSwap(
     config: any,
     parameters: Record<string, any>
@@ -289,9 +288,6 @@ class ExecutionEngine {
     throw new Error('Swap functionality not yet implemented');
   }
 
-  /**
-   * Execute contract call (placeholder)
-   */
   private async executeContractCall(
     config: any,
     parameters: Record<string, any>
@@ -300,16 +296,10 @@ class ExecutionEngine {
     throw new Error('Contract call functionality not yet implemented');
   }
 
-  /**
-   * Get execution status
-   */
   getExecution(executionId: string): ExecutionResult | undefined {
     return this.executions.get(executionId);
   }
 
-  /**
-   * Get all executions for an automation
-   */
   getAutomationExecutions(automationId: string): ExecutionResult[] {
     return Array.from(this.executions.values()).filter(
       (e) => e.executionId.includes(automationId) || e.status === 'running'
@@ -317,5 +307,4 @@ class ExecutionEngine {
   }
 }
 
-// Export singleton
 export const executionEngine = new ExecutionEngine();

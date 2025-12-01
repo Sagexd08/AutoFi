@@ -1,15 +1,7 @@
-/**
- * Supabase Database Service
- * Provides typed database operations with Supabase as backend
- */
-
 import { SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseClient, createSupabaseAdmin } from '../config/supabase.js';
+import { createSupabaseAdmin } from '../config/supabase.js';
 import { logger } from '../utils/logger.js';
 
-/**
- * Automation record in Supabase
- */
 export interface AutomationRecord {
   id: string;
   user_id: string;
@@ -25,12 +17,10 @@ export interface AutomationRecord {
   deleted_at?: string;
 }
 
-/**
- * Execution history record
- */
 export interface ExecutionRecord {
   id: string;
   automation_id: string;
+  user_id: string;
   status: 'pending' | 'running' | 'success' | 'failed';
   transaction_hash?: string;
   block_number?: number;
@@ -43,21 +33,13 @@ export interface ExecutionRecord {
   completed_at?: string;
 }
 
-/**
- * Supabase Database Service
- */
 export class SupabaseDatabaseService {
-  private client: SupabaseClient;
   private admin: SupabaseClient;
 
   constructor() {
-    this.client = getSupabaseClient();
     this.admin = createSupabaseAdmin();
   }
 
-  /**
-   * Create automation
-   */
   async createAutomation(automation: Omit<AutomationRecord, 'id' | 'created_at' | 'updated_at'>): Promise<AutomationRecord> {
     try {
       const { data, error } = await this.admin
@@ -82,12 +64,9 @@ export class SupabaseDatabaseService {
     }
   }
 
-  /**
-   * Get automation by ID
-   */
   async getAutomation(automationId: string, userId: string): Promise<AutomationRecord | null> {
     try {
-      const { data, error } = await this.client
+      const { data, error } = await this.admin
         .from('automations')
         .select('*')
         .eq('id', automationId)
@@ -97,7 +76,7 @@ export class SupabaseDatabaseService {
 
       if (error) {
         if (error.code === 'PGRST116') {
-          return null; // Not found
+          return null;
         }
         logger.error('Failed to get automation', { error });
         throw error;
@@ -110,9 +89,6 @@ export class SupabaseDatabaseService {
     }
   }
 
-  /**
-   * List automations for user
-   */
   async listAutomations(
     userId: string,
     options?: {
@@ -122,7 +98,7 @@ export class SupabaseDatabaseService {
     }
   ): Promise<{ automations: AutomationRecord[]; total: number }> {
     try {
-      let query = this.client
+      let query = this.admin
         .from('automations')
         .select('*', { count: 'exact' })
         .eq('user_id', userId)
@@ -156,9 +132,6 @@ export class SupabaseDatabaseService {
     }
   }
 
-  /**
-   * Update automation
-   */
   async updateAutomation(
     automationId: string,
     userId: string,
@@ -189,9 +162,6 @@ export class SupabaseDatabaseService {
     }
   }
 
-  /**
-   * Soft delete automation
-   */
   async deleteAutomation(automationId: string, userId: string): Promise<void> {
     try {
       const { error } = await this.admin
@@ -212,9 +182,6 @@ export class SupabaseDatabaseService {
     }
   }
 
-  /**
-   * Record execution
-   */
   async recordExecution(execution: Omit<ExecutionRecord, 'id' | 'triggered_at'>): Promise<ExecutionRecord> {
     try {
       const { data, error } = await this.admin
@@ -241,19 +208,17 @@ export class SupabaseDatabaseService {
     }
   }
 
-  /**
-   * Get execution history for automation
-   */
   async getExecutionHistory(
     automationId: string,
     userId: string,
     limit: number = 20
   ): Promise<ExecutionRecord[]> {
     try {
-      const { data, error } = await this.client
+      const { data, error } = await this.admin
         .from('execution_history')
         .select('*')
         .eq('automation_id', automationId)
+        .eq('user_id', userId)
         .order('triggered_at', { ascending: false })
         .limit(limit);
 
@@ -269,12 +234,9 @@ export class SupabaseDatabaseService {
     }
   }
 
-  /**
-   * Get execution by ID
-   */
   async getExecution(executionId: string): Promise<ExecutionRecord | null> {
     try {
-      const { data, error } = await this.client
+      const { data, error } = await this.admin
         .from('execution_history')
         .select('*')
         .eq('id', executionId)
@@ -295,9 +257,6 @@ export class SupabaseDatabaseService {
     }
   }
 
-  /**
-   * Update execution status
-   */
   async updateExecutionStatus(
     executionId: string,
     updates: Partial<Pick<ExecutionRecord, 'status' | 'transaction_hash' | 'block_number' | 'gas_used' | 'error' | 'completed_at'>>
@@ -322,9 +281,6 @@ export class SupabaseDatabaseService {
     }
   }
 
-  /**
-   * Get user analytics
-   */
   async getUserAnalytics(userId: string): Promise<{
     totalAutomations: number;
     enabledAutomations: number;
@@ -334,15 +290,15 @@ export class SupabaseDatabaseService {
   }> {
     try {
       const [automationsData, executionsData] = await Promise.all([
-        this.client
+        this.admin
           .from('automations')
           .select('id, enabled', { count: 'exact' })
           .eq('user_id', userId)
           .is('deleted_at', null),
-        this.client
+        this.admin
           .from('execution_history')
           .select('status', { count: 'exact' })
-          .eq('automation_id', userId), // This assumes execution_history joins with automations
+          .eq('user_id', userId),
       ]);
 
       const automations = automationsData.data || [];
@@ -365,9 +321,6 @@ export class SupabaseDatabaseService {
     }
   }
 
-  /**
-   * Batch insert execution records
-   */
   async batchRecordExecutions(executions: Array<Omit<ExecutionRecord, 'id' | 'triggered_at'>>): Promise<ExecutionRecord[]> {
     try {
       const { data, error } = await this.admin
@@ -389,14 +342,8 @@ export class SupabaseDatabaseService {
   }
 }
 
-/**
- * Database service singleton
- */
 let databaseService: SupabaseDatabaseService | null = null;
 
-/**
- * Get database service instance
- */
 export function getDatabaseService(): SupabaseDatabaseService {
   if (!databaseService) {
     databaseService = new SupabaseDatabaseService();

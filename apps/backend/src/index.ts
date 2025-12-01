@@ -29,7 +29,6 @@ import { webSocketService } from './services/websocket.js';
 
 dotenv.config();
 
-// Validate environment variables on startup
 validateBackendEnvironment();
 const env = getBackendEnv();
 const envConfig = getEnvironmentConfig();
@@ -115,18 +114,14 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   res.status(statusCode).json(response);
 });
 
-// Initialize services and start server
 async function startServer() {
   try {
-    // Initialize vector database
     await vectorDBService.initialize();
     logger.info('Vector database initialized');
 
-    // Initialize AI service
     await aiService.initialize();
     logger.info('AI service initialized');
 
-    // Initialize WebSocket server
     webSocketService.initialize(server);
     logger.info('WebSocket server initialized');
 

@@ -1,14 +1,8 @@
-/**
- * Analytics API Routes
- * Provides analytics and insights for automations
- */
-
 import express, { Router, Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger.js';
 
 const router: Router = express.Router();
 
-// In-memory analytics store (replace with proper DB/metrics later)
 const analyticsData = {
   totalAutomations: 0,
   activeAutomations: 0,
@@ -20,10 +14,6 @@ const analyticsData = {
   functionCalls: new Map<string, number>(),
 };
 
-/**
- * GET /api/analytics
- * Get overall analytics
- */
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const sessionId = req.query.sessionId as string | undefined;
@@ -58,10 +48,6 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-/**
- * GET /api/analytics/automation/:id
- * Get analytics for a specific automation
- */
 router.get('/automation/:id?', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const automationId = req.params.id;
@@ -92,10 +78,6 @@ router.get('/automation/:id?', async (req: Request, res: Response, next: NextFun
   }
 });
 
-/**
- * GET /api/analytics/blockchain
- * Get blockchain analytics
- */
 router.get('/blockchain', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const mostUsedFunctions = [
@@ -113,7 +95,7 @@ router.get('/blockchain', async (_req: Request, res: Response, next: NextFunctio
         successfulTransactions: analyticsData.successfulTransactions || 367,
         failedTransactions: analyticsData.failedTransactions || 17,
         totalGasUsed: analyticsData.totalGasUsed || '45678901234',
-        averageGasPrice: '5000000000', // 5 Gwei
+        averageGasPrice: '5000000000',
         mostUsedFunctions,
         networkStats: {
           blockHeight: 25000000 + Math.floor(Math.random() * 100000),
@@ -127,16 +109,11 @@ router.get('/blockchain', async (_req: Request, res: Response, next: NextFunctio
   }
 });
 
-/**
- * GET /api/analytics/logs
- * Get automation execution logs
- */
 router.get('/logs', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
     
-    // Generate mock logs
     const logs = [];
     const types = ['info', 'success', 'warning', 'error'];
     const actions = [
@@ -178,17 +155,12 @@ router.get('/logs', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-/**
- * POST /api/analytics/track
- * Track an event (for internal use)
- */
 router.post('/track', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { event, data } = req.body;
     
     logger.info('Analytics event tracked', { event, data });
     
-    // Update in-memory analytics
     switch (event) {
       case 'automation_created':
         analyticsData.totalAutomations++;
