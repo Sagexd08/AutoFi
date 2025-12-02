@@ -1,5 +1,7 @@
 import type { LangChainAgent } from '@celo-automator/langchain-agent';
 import type { RiskEngine, TransactionContext, ValidationResult } from '@celo-ai/risk-engine';
+import type { SwarmCoordinator } from './swarm-coordinator.js';
+import type { AgentMessage } from '@celo-automator/types';
 import type {
   SpecializedAgent,
   SpecializedAgentConfig,
@@ -11,11 +13,57 @@ export abstract class BaseAgent implements SpecializedAgent {
   protected config: SpecializedAgentConfig;
   protected riskEngine: RiskEngine;
   protected langchainAgent: LangChainAgent;
+  protected swarm?: SwarmCoordinator;
 
   constructor(config: SpecializedAgentConfig) {
     this.config = config;
     this.riskEngine = config.riskEngine;
     this.langchainAgent = config.langchainAgent;
+    this.swarm = config.swarmCoordinator;
+
+    if (this.swarm) {
+      this.swarm.registerAgent(this.config.id, this.config.type);
+      this.swarm.on(`message:${this.config.id}`, this.handleMessage.bind(this));
+    }
+  }
+
+  protected async handleMessage(message: AgentMessage) {
+    if (this.onMessage) {
+      await this.onMessage(message);
+    }
+  }
+
+  async onMessage(message: AgentMessage): Promise<void> {
+    // Default implementation: log it
+    console.log(`[Agent ${this.config.id}] Received message from ${message.from}:`, message.content);
+  }
+
+  protected async sendMessageToSwarm(to: string, content: any, type: AgentMessage['type'] = 'proposal') {
+    if (!this.swarm) return;
+    
+    await this.swarm.sendMessage({
+      id: crypto.randomUUID(),
+      from: this.config.id,
+      to,
+      type,
+      content,
+      timestamp: Date.now()
+    });
+  }
+
+  protected async broadcastToSwarm(content: any, role?: string) {
+    if (!this.swarm) return;
+
+    await this.swarm.sendMessage({
+      id: crypto.randomUUID(),
+      from: this.config.id,
+      to: 'broadcast',
+      scope: role ? 'role' : 'global',
+      role,
+      type: 'alert',
+      content,
+      timestamp: Date.now()
+    });
   }
 
   getConfig(): SpecializedAgentConfig {

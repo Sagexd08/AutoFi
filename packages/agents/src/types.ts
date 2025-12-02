@@ -1,6 +1,7 @@
 import type { RiskEngine } from '@celo-ai/risk-engine';
 import type { LangChainAgent } from '@celo-automator/langchain-agent';
 import type { TransactionContext, ValidationResult } from '@celo-ai/risk-engine';
+import type { SwarmCoordinator } from './swarm-coordinator.js';
 
 export type SpecializedAgentType = 'treasury' | 'defi' | 'nft' | 'governance' | 'donation';
 
@@ -12,6 +13,7 @@ export interface SpecializedAgentConfig {
   objectives?: string[];
   langchainAgent: LangChainAgent;
   riskEngine: RiskEngine;
+  swarmCoordinator?: SwarmCoordinator;
   promptPreamble?: string;
   metadata?: Record<string, unknown>;
 }
@@ -47,9 +49,12 @@ export interface AgentTemplateOverrides {
   metadata?: Record<string, unknown>;
 }
 
+import type { AgentMessage } from '@celo-automator/types';
+
 export type SpecializedAgent = {
   getConfig(): SpecializedAgentConfig;
   processPrompt(prompt: string, options?: ProcessPromptOptions): Promise<AgentResponse>;
+  onMessage?(message: AgentMessage): Promise<void>;
 };
 
 export interface AgentTemplate {

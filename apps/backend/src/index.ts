@@ -15,10 +15,11 @@ import { walletRoutes } from './routes/wallet.js';
 import { eventRoutes } from './routes/events.js';
 import { healthRoutes } from './routes/health.js';
 import { aiRoutes } from './routes/ai.js';
-import { automationsRoutes } from './routes/automations.js';
+import automationsRoutes from './routes/automations.js';
 import { analyticsRoutes } from './routes/analytics.js';
 import { statusRoutes } from './routes/status.js';
 import { blockchainRoutes } from './routes/blockchain.js';
+import { swarmRoutes } from './routes/swarm.js';
 import { logger } from './utils/logger.js';
 import { sanitizeErrorForLogging, generateErrorCode } from './utils/error-sanitizer.js';
 import { setupMetricsRoute } from './middleware/metrics-route.js';
@@ -26,6 +27,7 @@ import { auditMiddleware } from './middleware/audit.js';
 import { vectorDBService } from './services/vector-db.js';
 import { aiService } from './services/ai.js';
 import { webSocketService } from './services/websocket.js';
+import { swarmService } from './services/swarm.js';
 
 dotenv.config();
 
@@ -63,6 +65,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/system', statusRoutes);
 app.use('/api/status', statusRoutes);
 app.use('/api/blockchain', blockchainRoutes);
+app.use('/api/swarm', swarmRoutes);
 
 setupMetricsRoute(app);
 
@@ -121,6 +124,9 @@ async function startServer() {
 
     await aiService.initialize();
     logger.info('AI service initialized');
+
+    await swarmService.initialize();
+    logger.info('Swarm service initialized');
 
     webSocketService.initialize(server);
     logger.info('WebSocket server initialized');

@@ -43,3 +43,5 @@ export interface ToolDefinition {
   parameters: Record<string, any>;
   handler: (params: Record<string, any>) => Promise<any>;
 }
+
+export * from './swarm.js';

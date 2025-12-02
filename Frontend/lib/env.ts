@@ -56,7 +56,7 @@ const publicEnvSchema = z.object({
 
   // Analytics (Optional)
   NEXT_PUBLIC_ANALYTICS_ID: z.string().optional().default(''),
-  NEXT_PUBLIC_SENTRY_DSN: z.string().url('Invalid Sentry DSN').optional().default(''),
+  NEXT_PUBLIC_SENTRY_DSN: z.union([z.string().url('Invalid Sentry DSN'), z.literal('')]).default(''),
 });
 
 /**

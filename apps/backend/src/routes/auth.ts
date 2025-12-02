@@ -6,10 +6,10 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { logger } from '../utils/logger.js';
-import { authMiddleware, generateToken, refreshToken as refreshTokenFn } from '../middleware/auth.js';
+import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
 import { getAuthService } from '../services/supabase-auth.js';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * Validation schemas
@@ -59,11 +59,12 @@ router.post('/signup', async (req: Request, res: Response) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Validation failed',
         details: error.errors,
       });
+      return;
     }
 
     logger.error('Sign up error', { error: String(error) });
@@ -99,11 +100,12 @@ router.post('/signin', async (req: Request, res: Response) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Validation failed',
         details: error.errors,
       });
+      return;
     }
 
     logger.error('Sign in error', { error: String(error) });
@@ -140,11 +142,12 @@ router.post('/wallet-verify', async (req: Request, res: Response) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Validation failed',
         details: error.errors,
       });
+      return;
     }
 
     logger.error('Wallet verification error', { error: String(error) });
@@ -178,11 +181,12 @@ router.post('/refresh', async (req: Request, res: Response) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Validation failed',
         details: error.errors,
       });
+      return;
     }
 
     logger.error('Token refresh error', { error: String(error) });
@@ -197,7 +201,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
  * POST /auth/signout
  * Sign out user (token-based, no state needed)
  */
-router.post('/signout', authMiddleware, async (req: Request, res: Response) => {
+router.post('/signout', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const authService = getAuthService();
     await authService.signOut();
@@ -221,13 +225,14 @@ router.post('/signout', authMiddleware, async (req: Request, res: Response) => {
  * GET /auth/me
  * Get current user profile
  */
-router.get('/me', authMiddleware, async (req: Request, res: Response) => {
+router.get('/me', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     if (!req.user) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: 'Not authenticated',
       });
+      return;
     }
 
     res.json({
@@ -266,11 +271,12 @@ router.post('/password-reset', async (req: Request, res: Response) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Validation failed',
         details: error.errors,
       });
+      return;
     }
 
     logger.error('Password reset error', { error: String(error) });
@@ -300,11 +306,12 @@ router.post('/confirm-email', async (req: Request, res: Response) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Validation failed',
         details: error.errors,
       });
+      return;
     }
 
     logger.error('Email confirmation error', { error: String(error) });

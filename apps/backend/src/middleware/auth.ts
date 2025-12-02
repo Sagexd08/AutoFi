@@ -40,10 +40,11 @@ export async function authMiddleware(req: AuthenticatedRequest, res: Response, n
   const token = extractToken(req);
 
   if (!token) {
-    return res.status(401).json({
+    res.status(401).json({
       success: false,
       error: 'Missing authentication token',
     });
+    return;
   }
 
   try {
@@ -52,7 +53,8 @@ export async function authMiddleware(req: AuthenticatedRequest, res: Response, n
       const user = await validateSupabaseToken(token);
       req.user = user;
       req.token = token;
-      return next();
+      next();
+      return;
     } catch (error) {
       logger.debug('Supabase token validation failed, trying custom JWT', { error: String(error) });
     }
@@ -73,14 +75,15 @@ export async function authMiddleware(req: AuthenticatedRequest, res: Response, n
     logger.warn('Invalid token', { error: String(error) });
 
     if (error instanceof jwt.TokenExpiredError) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: 'Token expired',
         code: 'TOKEN_EXPIRED',
       });
+      return;
     }
 
-    return res.status(401).json({
+    res.status(401).json({
       success: false,
       error: 'Invalid token',
     });
@@ -90,11 +93,12 @@ export async function authMiddleware(req: AuthenticatedRequest, res: Response, n
 /**
  * Optional authentication middleware - doesn't fail if no token, but validates if present
  */
-export async function optionalAuthMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export async function optionalAuthMiddleware(req: AuthenticatedRequest, _res: Response, next: NextFunction) {
   const token = extractToken(req);
 
   if (!token) {
-    return next();
+    next();
+    return;
   }
 
   try {
@@ -103,7 +107,8 @@ export async function optionalAuthMiddleware(req: AuthenticatedRequest, res: Res
       const user = await validateSupabaseToken(token);
       req.user = user;
       req.token = token;
-      return next();
+      next();
+      return;
     } catch (error) {
       logger.debug('Supabase token validation failed, trying custom JWT', { error: String(error) });
     }
@@ -132,20 +137,22 @@ export async function optionalAuthMiddleware(req: AuthenticatedRequest, res: Res
 export function requireScope(...scopes: string[]) {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: 'Authentication required',
       });
+      return;
     }
 
     const hasScope = scopes.some((scope) => req.user!.scope.includes(scope));
 
     if (!hasScope) {
-      return res.status(403).json({
+      res.status(403).json({
         success: false,
         error: 'Insufficient permissions',
         requiredScopes: scopes,
       });
+      return;
     }
 
     next();

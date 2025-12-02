@@ -1,4 +1,6 @@
 import { BaseAgent } from './base-agent.js';
+import type { ProcessPromptOptions, AgentResponse } from './types.js';
+import type { AgentMessage } from '@celo-automator/types';
 
 export class TreasuryAgent extends BaseAgent {
   protected getSystemPrompt(): string {
@@ -27,6 +29,21 @@ When analyzing treasury requests:
 6. Provide clear reasoning for all recommendations
 
 Always prioritize safety and compliance with spending limits.`;
+  }
+
+  async onMessage(message: AgentMessage): Promise<void> {
+    if (message.type === 'proposal' && message.content.action === 'strategy_proposal') {
+      console.log(`[TreasuryAgent] Analyzing proposal from ${message.from}`);
+      
+      // In a real implementation, we would parse the plan and validate against treasury rules
+      // For now, we'll just acknowledge receipt and perform a basic risk check if transactions exist
+      
+      await this.sendMessageToSwarm(message.from, {
+        action: 'proposal_review',
+        status: 'received',
+        message: 'Treasury is reviewing your proposal'
+      }, 'response');
+    }
   }
 }
 
@@ -58,6 +75,21 @@ When processing DeFi requests:
 6. Monitor positions and suggest rebalancing
 
 Always ensure transactions comply with spending limits and risk thresholds.`;
+  }
+
+  async processPrompt(prompt: string, options?: ProcessPromptOptions): Promise<AgentResponse> {
+    const response = await super.processPrompt(prompt, options);
+    
+    // Broadcast the plan to the swarm for review/collaboration
+    if (response.plan && this.swarm) {
+      await this.broadcastToSwarm({
+        action: 'strategy_proposal',
+        plan: response.plan,
+        reasoning: response.reasoning
+      }, 'treasury');
+    }
+    
+    return response;
   }
 }
 
