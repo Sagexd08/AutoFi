@@ -15,6 +15,7 @@ export class AutoRevokeSystem {
     private revokeQueue: Map<string, RevokeQueueItem>;
     private isProcessing: boolean;
     private processInterval: NodeJS.Timeout | null;
+    private revocationHandler: ((approvalId: string) => Promise<boolean>) | null = null;
 
     constructor(db: AllowanceDatabase) {
         this.db = db;
@@ -25,10 +26,16 @@ export class AutoRevokeSystem {
 
     /**
      * Start the auto-revoke processor
+     * @param intervalMs Check interval in milliseconds
+     * @param onRevoke Optional callback to handle actual revocation (e.g. trigger wallet)
      */
-    start(intervalMs: number = 60000): void {
+    start(intervalMs: number = 60000, onRevoke?: (approvalId: string) => Promise<boolean>): void {
         if (this.processInterval) {
             return; // Already running
+        }
+
+        if (onRevoke) {
+            this.revocationHandler = onRevoke;
         }
 
         this.processInterval = setInterval(() => {
@@ -175,11 +182,23 @@ export class AutoRevokeSystem {
                     continue;
                 }
 
-                // Note: In a real implementation, you would need to provide
-                // wallet client and public client here. For now, we'll just
-                // mark it as pending and let the user handle the actual revocation.
+                // If a handler is registered (e.g. frontend wallet trigger), attempt to revoke
+                if (this.revocationHandler) {
+                    console.log(`Triggering revocation handler for approval ${item.approvalId}`);
+                    try {
+                        const success = await this.revocationHandler(item.approvalId);
+                        if (success) {
+                            console.log(`Handler successfully processed revocation for ${item.approvalId}`);
+                            this.revokeQueue.delete(item.approvalId);
+                            continue;
+                        }
+                    } catch (err) {
+                        console.error(`Revocation handler failed for ${item.approvalId}:`, err);
+                    }
+                }
 
-                console.log(`Approval ${item.approvalId} ready for revocation`);
+                // Fallback: Mark as pending revoke for UI to pick up
+                console.log(`Approval ${item.approvalId} marked pending revocation`);
                 this.db.updateApprovalStatus(item.approvalId, ApprovalStatus.PENDING_REVOKE);
                 this.revokeQueue.delete(item.approvalId);
             }
