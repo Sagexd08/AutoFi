@@ -2,8 +2,8 @@
 
 import { Card } from "@/components/ui/card"
 import type { LucideIcon } from "lucide-react"
-import { motion } from "framer-motion"
-import { useEffect, useState } from "react"
+import { motion, useMotionValue, useTransform, animate } from "framer-motion"
+import { useEffect } from "react"
 
 interface StatsCardProps {
   label: string
@@ -15,33 +15,15 @@ interface StatsCardProps {
 }
 
 function AnimatedCounter({ value, duration = 1.5 }: { value: number; duration?: number }) {
-  const [displayValue, setDisplayValue] = useState(0)
+  const count = useMotionValue(0)
+  const rounded = useTransform(count, (latest) => Math.floor(latest))
 
   useEffect(() => {
-    if (typeof value !== "number") return
+    const controls = animate(count, value, { duration })
+    return controls.stop
+  }, [count, value, duration])
 
-    let startTime: number
-    let animationFrame: number
-
-    const animate = (currentTime: number) => {
-      if (!startTime) startTime = currentTime
-      const elapsed = currentTime - startTime
-      const progress = Math.min(elapsed / (duration * 1000), 1)
-
-      setDisplayValue(Math.floor(value * progress))
-
-      if (progress < 1) {
-        animationFrame = requestAnimationFrame(animate)
-      } else {
-        setDisplayValue(value)
-      }
-    }
-
-    animationFrame = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(animationFrame)
-  }, [value, duration])
-
-  return <span>{displayValue}</span>
+  return <motion.span>{rounded}</motion.span>
 }
 
 export function StatsCard({ label, value, icon: Icon, color, delay = 0, loading = false }: StatsCardProps) {
