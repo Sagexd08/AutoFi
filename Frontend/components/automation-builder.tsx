@@ -71,7 +71,9 @@ export function AutomationBuilder({ onSuccess }: AutomationBuilderProps) {
   const [loading, setLoading] = useState(false)
   const [aiMode, setAiMode] = useState(false)
   const [aiPrompt, setAiPrompt] = useState("")
-  const { addAutomation, createAutomationWithAI } = useStore()
+  // Optimization: Use selectors to prevent unnecessary re-renders when other state changes
+  const addAutomation = useStore((state) => state.addAutomation)
+  const createAutomationWithAI = useStore((state) => state.createAutomationWithAI)
 
   const form = useForm<AutomationFormData>({
     resolver: zodResolver(automationSchema),
