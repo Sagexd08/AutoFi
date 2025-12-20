@@ -13,7 +13,10 @@ import { ArrowLeft, Play, Pause, Settings, Activity, Clock, DollarSign } from "l
 export default function AutomationDetails() {
   const params = useParams()
   const router = useRouter()
-  const { automations, pauseAutomation, resumeAutomation } = useStore()
+  // Optimize: Select only needed state and actions
+  const automations = useStore((state) => state.automations)
+  const pauseAutomation = useStore((state) => state.pauseAutomation)
+  const resumeAutomation = useStore((state) => state.resumeAutomation)
   const [automation, setAutomation] = useState<any>(null)
 
   useEffect(() => {
