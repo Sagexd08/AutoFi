@@ -6,7 +6,12 @@ import { StatsCard } from "./stats-card"
 import { motion } from "framer-motion"
 
 export default function DashboardOverview() {
-  const { automations, wallet, totalProcessed, pendingAlerts, loading } = useStore()
+  // Optimization: Use selectors to prevent unnecessary re-renders when other parts of the store change
+  const automations = useStore((state) => state.automations)
+  const wallet = useStore((state) => state.wallet)
+  const totalProcessed = useStore((state) => state.totalProcessed)
+  const pendingAlerts = useStore((state) => state.pendingAlerts)
+  const loading = useStore((state) => state.loading)
 
   const activeCount = automations.filter((a) => a.status === "active").length
 

@@ -6,7 +6,10 @@ import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 
 export default function DashboardCards() {
-  const { automations, pauseAutomation, resumeAutomation } = useStore()
+  // Optimization: Use selectors to prevent unnecessary re-renders when other parts of the store change
+  const automations = useStore((state) => state.automations)
+  const pauseAutomation = useStore((state) => state.pauseAutomation)
+  const resumeAutomation = useStore((state) => state.resumeAutomation)
   const router = useRouter()
 
   const handleViewDetails = (id: string) => {
