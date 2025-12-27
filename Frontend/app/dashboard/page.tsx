@@ -11,7 +11,12 @@ import { Plus, Play, Pause, Trash2, ExternalLink } from "lucide-react"
 
 export default function Dashboard() {
   const router = useRouter()
-  const { automations, loadAutomations, pauseAutomation, resumeAutomation, deleteAutomation } = useStore()
+  // Optimization: Use granular selectors to avoid re-rendering on unrelated store updates
+  const automations = useStore((state) => state.automations)
+  const loadAutomations = useStore((state) => state.loadAutomations)
+  const pauseAutomation = useStore((state) => state.pauseAutomation)
+  const resumeAutomation = useStore((state) => state.resumeAutomation)
+  const deleteAutomation = useStore((state) => state.deleteAutomation)
 
   useEffect(() => {
     loadAutomations()
