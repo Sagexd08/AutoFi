@@ -6,7 +6,13 @@ import { StatsCard } from "./stats-card"
 import { motion } from "framer-motion"
 
 export default function DashboardOverview() {
-  const { automations, wallet, totalProcessed, pendingAlerts, loading } = useStore()
+  // ⚡ Performance: Use granular selectors to prevent unnecessary re-renders
+  // when unrelated parts of the store change (e.g., error, specific wallet tokens)
+  const automations = useStore((state) => state.automations)
+  const walletBalance = useStore((state) => state.wallet.balance)
+  const totalProcessed = useStore((state) => state.totalProcessed)
+  const pendingAlerts = useStore((state) => state.pendingAlerts)
+  const loading = useStore((state) => state.loading)
 
   const activeCount = automations.filter((a) => a.status === "active").length
 
@@ -31,7 +37,7 @@ export default function DashboardOverview() {
         />
         <StatsCard
           label="Wallet Balance"
-          value={wallet.balance ? `${wallet.balance} CELO` : "0 CELO"}
+          value={walletBalance ? `${walletBalance} CELO` : "0 CELO"}
           icon={Wallet}
           color="accent"
           delay={0.2}
