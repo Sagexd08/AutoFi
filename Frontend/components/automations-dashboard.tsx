@@ -8,11 +8,11 @@
 import { useState, useEffect } from 'react';
 import { useAutomations } from '@/hooks/use-automations';
 import { useBlockchain } from '@/hooks/use-blockchain';
-import { apiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, CheckCircle2, Clock, Zap } from 'lucide-react';
+import { AnalyticsStats } from '@/components/analytics-stats';
 
 export function AutomationsDashboard() {
   const {
@@ -24,26 +24,7 @@ export function AutomationsDashboard() {
   } = useAutomations();
 
   const { balance, getBalance } = useBlockchain();
-  const [analytics, setAnalytics] = useState<any>(null);
   const [executing, setExecuting] = useState<string | null>(null);
-
-  // Fetch analytics on mount
-  useEffect(() => {
-    async function fetchAnalytics() {
-      try {
-        const response = await apiClient.getAnalytics();
-        if (response.success) {
-          setAnalytics(response.data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch analytics:', error);
-      }
-    }
-
-    fetchAnalytics();
-    const interval = setInterval(fetchAnalytics, 30000); // Refresh every 30s
-    return () => clearInterval(interval);
-  }, []);
 
   const handleExecute = async (automationId: string) => {
     setExecuting(automationId);
@@ -82,67 +63,7 @@ export function AutomationsDashboard() {
       )}
 
       {/* Analytics Cards */}
-      {analytics && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
-                Total Automations
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{analytics.totalAutomations}</p>
-              <p className="text-xs text-gray-500">
-                {analytics.activeAutomations} active
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
-                Success Rate
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{analytics.successRate?.toFixed(1)}%</p>
-              <p className="text-xs text-gray-500">
-                {analytics.totalTransactions} transactions
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
-                Avg. Execution Time
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">
-                {(analytics.averageExecutionTime / 1000).toFixed(2)}s
-              </p>
-              <p className="text-xs text-gray-500">milliseconds</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
-                Most Used
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">
-                {analytics.mostUsedFunctions?.[0]?.functionName || 'N/A'}
-              </p>
-              <p className="text-xs text-gray-500">
-                {analytics.mostUsedFunctions?.[0]?.count} calls
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      <AnalyticsStats />
 
       {/* Automations List */}
       <div className="space-y-4">
