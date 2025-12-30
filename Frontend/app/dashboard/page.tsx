@@ -11,7 +11,14 @@ import { Plus, Play, Pause, Trash2, ExternalLink } from "lucide-react"
 
 export default function Dashboard() {
   const router = useRouter()
-  const { automations, loadAutomations, pauseAutomation, resumeAutomation, deleteAutomation } = useStore()
+
+  // ⚡ Bolt: Optimized state selection to prevent unnecessary re-renders
+  // when unrelated store properties (like wallet, analytics) change.
+  const automations = useStore((state) => state.automations)
+  const loadAutomations = useStore((state) => state.loadAutomations)
+  const pauseAutomation = useStore((state) => state.pauseAutomation)
+  const resumeAutomation = useStore((state) => state.resumeAutomation)
+  const deleteAutomation = useStore((state) => state.deleteAutomation)
 
   useEffect(() => {
     loadAutomations()
