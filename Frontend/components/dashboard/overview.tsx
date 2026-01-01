@@ -4,9 +4,20 @@ import { useStore } from "@/lib/store"
 import { Wallet, TrendingUp, Zap, AlertCircle } from "lucide-react"
 import { StatsCard } from "./stats-card"
 import { motion } from "framer-motion"
+import { useShallow } from "zustand/react/shallow"
 
 export default function DashboardOverview() {
-  const { automations, wallet, totalProcessed, pendingAlerts, loading } = useStore()
+  // ⚡ Bolt Optimization: Use granular selectors to prevent re-renders when unrelated store parts update
+  // Previously: const { automations, wallet, totalProcessed, pendingAlerts, loading } = useStore()
+  const { automations, walletBalance, totalProcessed, pendingAlerts, loading } = useStore(
+    useShallow((state) => ({
+      automations: state.automations,
+      walletBalance: state.wallet.balance,
+      totalProcessed: state.totalProcessed,
+      pendingAlerts: state.pendingAlerts,
+      loading: state.loading,
+    }))
+  )
 
   const activeCount = automations.filter((a) => a.status === "active").length
 
@@ -31,7 +42,7 @@ export default function DashboardOverview() {
         />
         <StatsCard
           label="Wallet Balance"
-          value={wallet.balance ? `${wallet.balance} CELO` : "0 CELO"}
+          value={walletBalance ? `${walletBalance} CELO` : "0 CELO"}
           icon={Wallet}
           color="accent"
           delay={0.2}
