@@ -10,6 +10,7 @@ const nextConfig = {
   env: {
     PORT: '3002',
   },
+  serverExternalPackages: ['pino', 'thread-stream', 'pino-file'],
 }
 
 export default nextConfig
