@@ -1,21 +1,43 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useStore } from "@/lib/store"
+import { useShallow } from "zustand/react/shallow"
 import Navbar from "@/components/navbar"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Plus, Play, Pause, Trash2, ExternalLink } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Plus } from "lucide-react"
+import { AutomationCard } from "@/components/automation-card"
 
 export default function Dashboard() {
   const router = useRouter()
-  const { automations, loadAutomations, pauseAutomation, resumeAutomation, deleteAutomation } = useStore()
+
+  // Optimize selector with useShallow
+  const {
+    automations,
+    loadAutomations,
+    pauseAutomation,
+    resumeAutomation,
+    deleteAutomation
+  } = useStore(
+    useShallow((state) => ({
+      automations: state.automations,
+      loadAutomations: state.loadAutomations,
+      pauseAutomation: state.pauseAutomation,
+      resumeAutomation: state.resumeAutomation,
+      deleteAutomation: state.deleteAutomation,
+    }))
+  )
 
   useEffect(() => {
     loadAutomations()
   }, [loadAutomations])
+
+  // Memoize handlers to prevent re-creation on every render
+  const handlePause = useCallback((id: string) => pauseAutomation(id), [pauseAutomation])
+  const handleResume = useCallback((id: string) => resumeAutomation(id), [resumeAutomation])
+  const handleDelete = useCallback((id: string) => deleteAutomation(id), [deleteAutomation])
 
   return (
     <main className="min-h-screen bg-background">
@@ -39,38 +61,13 @@ export default function Dashboard() {
             </Card>
           ) : (
             automations.map((automation) => (
-              <Card key={automation.id}>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-xl font-bold">{automation.name}</CardTitle>
-                  <Badge variant={automation.status === 'active' ? 'default' : 'secondary'}>
-                    {automation.status}
-                  </Badge>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex justify-between items-center mt-4">
-                    <div className="text-sm text-muted-foreground">
-                      Type: <span className="capitalize">{automation.type}</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => router.push(`/dashboard/${automation.id}`)}>
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                      {automation.status === 'active' ? (
-                        <Button variant="outline" size="sm" onClick={() => pauseAutomation(automation.id)}>
-                          <Pause className="h-4 w-4" />
-                        </Button>
-                      ) : (
-                        <Button variant="outline" size="sm" onClick={() => resumeAutomation(automation.id)}>
-                          <Play className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <Button variant="destructive" size="sm" onClick={() => deleteAutomation(automation.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <AutomationCard
+                key={automation.id}
+                automation={automation}
+                onPause={handlePause}
+                onResume={handleResume}
+                onDelete={handleDelete}
+              />
             ))
           )}
         </div>
