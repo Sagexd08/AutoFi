@@ -2,6 +2,7 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useShallow } from "zustand/react/shallow"
 import { useStore } from "@/lib/store"
 import Navbar from "@/components/navbar"
 import { Button } from "@/components/ui/button"
@@ -11,7 +12,15 @@ import { Plus, Play, Pause, Trash2, ExternalLink } from "lucide-react"
 
 export default function Dashboard() {
   const router = useRouter()
-  const { automations, loadAutomations, pauseAutomation, resumeAutomation, deleteAutomation } = useStore()
+  const { automations, loadAutomations, pauseAutomation, resumeAutomation, deleteAutomation } = useStore(
+    useShallow((state) => ({
+      automations: state.automations,
+      loadAutomations: state.loadAutomations,
+      pauseAutomation: state.pauseAutomation,
+      resumeAutomation: state.resumeAutomation,
+      deleteAutomation: state.deleteAutomation,
+    }))
+  )
 
   useEffect(() => {
     loadAutomations()
